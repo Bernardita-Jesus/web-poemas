@@ -8,6 +8,31 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="poem-card" id="poemCard"></div>
+<div class="bg-toolbar">
+  <button id="sortBrightnessBtn" class="icon-btn" title="Ordenar por brillo" aria-label="Ordenar por brillo">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </button>
+  <button id="shuffleBtn" class="icon-btn" title="Aleatorizar" aria-label="Aleatorizar">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="16 3 21 3 21 8"></polyline>
+      <line x1="4" y1="20" x2="21" y2="3"></line>
+      <polyline points="21 16 21 21 16 21"></polyline>
+      <line x1="15" y1="15" x2="21" y2="21"></line>
+      <line x1="4" y1="4" x2="9" y2="9"></line>
+    </svg>
+  </button>
+</div>
 <div class="wrap">
   <div class="panel">
     <div>
@@ -34,13 +59,13 @@
 
     <div id="fixedSizeControls">
       <div class="field">
-        <label>Ancho del recorte: <span class="rangeval" id="tileWVal">160</span> px</label>
-        <input type="range" id="tileW" min="60" max="260" value="160" step="2">
+        <label>Ancho del recorte: <span class="rangeval" id="tileWVal">120</span> px</label>
+        <input type="range" id="tileW" min="60" max="260" value="120" step="2">
       </div>
 
       <div class="field">
-        <label>Alto del recorte: <span class="rangeval" id="tileHVal">160</span> px</label>
-        <input type="range" id="tileH" min="60" max="200" value="160" step="2">
+        <label>Alto del recorte: <span class="rangeval" id="tileHVal">60</span> px</label>
+        <input type="range" id="tileH" min="60" max="200" value="60" step="2">
       </div>
     </div>
 
@@ -86,6 +111,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>

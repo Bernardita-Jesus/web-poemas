@@ -1,6 +1,13 @@
 let uploadedImages = [];
 let mosaicCanvas = null;
 
+// Recortes ya calculados (color, brillo, imgData) del último mosaico armado,
+// y el layout con el que se dibujaron — se guardan para poder reordenar
+// (botones "Ordenar por brillo" / "Aleatorizar") sin repetir todo el
+// procesamiento de imágenes, que es la parte lenta.
+let currentTiles = [];
+let currentLayout = null;
+
 const fileInput = document.getElementById('fileInput');
 const dropzone = document.getElementById('dropzone');
 const thumbrow = document.getElementById('thumbrow');
@@ -23,6 +30,8 @@ const maxWidthVal = document.getElementById('maxWidthVal');
 const sortMode = document.getElementById('sortMode');
 const jitterSlider = document.getElementById('jitter');
 const jitterVal = document.getElementById('jitterVal');
+const sortBrightnessBtn = document.getElementById('sortBrightnessBtn');
+const shuffleBtn = document.getElementById('shuffleBtn');
 
 variableSizesCheckbox.addEventListener('change', () => {
   const on = variableSizesCheckbox.checked;
@@ -130,6 +139,11 @@ function rgbToHsb(r, g, b) {
 // Resolución de trabajo: más alta que antes para no perder nitidez en los recortes.
 const WORK_DIM = 960;
 
+// Factor de zoom aplicado antes de recortar: en vez de usar la foto completa
+// (encuadre "cover"), recorta una región más chica y centrada, así cada
+// pieza del mosaico muestra un detalle de más cerca en vez de la escena entera.
+const ZOOM = 1.35;
+
 function planFixedGrid(colsUnits, rowsUnits) {
   // one tile per cell — trivial "plan" for the fixed-size mode
   const plan = [];
@@ -190,7 +204,7 @@ function buildMosaic() {
     c.width = WORK_DIM;
     c.height = WORK_DIM;
     const cx = c.getContext('2d', { willReadFrequently: true });
-    const scale = Math.max(WORK_DIM / img.width, WORK_DIM / img.height);
+    const scale = Math.max(WORK_DIM / img.width, WORK_DIM / img.height) * ZOOM;
     const sw = WORK_DIM / scale, sh = WORK_DIM / scale;
     const sx = (img.width - sw) / 2, sy = (img.height - sh) / 2;
     cx.drawImage(img, sx, sy, sw, sh, 0, 0, WORK_DIM, WORK_DIM);
@@ -261,21 +275,10 @@ function buildMosaic() {
   function sortAndRender() {
     const mode = sortMode.value;
     const jitterAmount = parseInt(jitterSlider.value, 10) / 100; // 0..1
+    applySort(tiles, mode, jitterAmount);
 
-    // Build a single numeric sort key per mode, then blend in noise scaled
-    // to that key's range. 0% jitter = strict sort, 100% = near shuffle.
-    tiles.forEach(t => {
-      let key;
-      if (mode === 'hue') key = t.h_; // 0..360
-      else if (mode === 'brightness') key = (1 - t.bri) * 360; // flip so low = bright, scale to 360
-      else if (mode === 'saturation') key = (1 - t.s) * 360;
-      else key = t.h_ + t.bri * 40; // hue-bright, small brightness nudge
-
-      const noise = (Math.random() - 0.5) * jitterAmount * 480; // up to ~±240 at max
-      t.sortKey = key + noise;
-    });
-
-    tiles.sort((a, b) => a.sortKey - b.sortKey);
+    currentTiles = tiles;
+    currentLayout = { variable, tileW, tileH, rowHeight, minWidth, maxWidth };
 
     processBtn.textContent = 'Dibujando…';
     const finish = () => {
@@ -285,21 +288,71 @@ function buildMosaic() {
       downloadBtn.disabled = false;
     };
 
-    if (variable) {
-      renderFlowMosaic(tiles, rowHeight, minWidth, maxWidth, finish);
-    } else {
-      renderFixedMosaic(tiles, tileW, tileH, finish);
-    }
+    renderCurrentTiles(finish);
   }
 
   processStep();
 }
 
+// Calcula una clave numérica de orden por recorte según el modo, y le suma
+// ruido proporcional a `jitterAmount` (0 = orden estricto, 1 ≈ mezcla total).
+// Se usa tanto al armar el mosaico por primera vez como al reordenar con los
+// botones flotantes.
+function applySort(tilesArr, mode, jitterAmount) {
+  if (mode === 'shuffle') {
+    for (let i = tilesArr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [tilesArr[i], tilesArr[j]] = [tilesArr[j], tilesArr[i]];
+    }
+    return;
+  }
+  tilesArr.forEach(t => {
+    let key;
+    if (mode === 'hue') key = t.h_; // 0..360
+    else if (mode === 'brightness') key = (1 - t.bri) * 360; // flip so low = bright, scale to 360
+    else if (mode === 'saturation') key = (1 - t.s) * 360;
+    else key = t.h_ + t.bri * 40; // hue-bright, small brightness nudge
+
+    const noise = (Math.random() - 0.5) * jitterAmount * 480; // up to ~±240 at max
+    t.sortKey = key + noise;
+  });
+  tilesArr.sort((a, b) => a.sortKey - b.sortKey);
+}
+
+function renderCurrentTiles(onDone) {
+  const { variable, tileW, tileH, rowHeight, minWidth, maxWidth } = currentLayout;
+  if (variable) {
+    renderFlowMosaic(currentTiles, rowHeight, minWidth, maxWidth, onDone);
+  } else {
+    renderFixedMosaic(currentTiles, tileW, tileH, onDone);
+  }
+}
+
+sortBrightnessBtn.addEventListener('click', () => {
+  if (currentTiles.length === 0) return;
+  applySort(currentTiles, 'brightness', 0);
+  renderCurrentTiles(() => {
+    imgCount.textContent = currentTiles.length + ' recortes armados.';
+  });
+});
+
+shuffleBtn.addEventListener('click', () => {
+  if (currentTiles.length === 0) return;
+  applySort(currentTiles, 'shuffle', 0);
+  renderCurrentTiles(() => {
+    imgCount.textContent = currentTiles.length + ' recortes armados.';
+  });
+});
+
 function renderFixedMosaic(tiles, tileW, tileH, onDone) {
   const n = tiles.length;
-  // Aim for a roughly square overall canvas even though each tile is a wide rectangle.
-  const rows = Math.ceil(Math.sqrt(n * (tileW / tileH)));
-  const cols = Math.ceil(n / rows);
+  // Ancho fijo (pensado para pantalla); las filas necesarias se apilan hacia
+  // abajo según cuántos recortes haya, así una mayor densidad de recortes
+  // se traduce en una página más larga en vez de un mosaico más cuadrado.
+  const TARGET_WIDTH = 1600;
+  const cols = Math.max(1, Math.round(TARGET_WIDTH / tileW));
+  const rows = Math.ceil(n / cols);
+  const total = rows * cols; // may be > n; leftover cells recycle tiles below so no cell is left blank
 
   const holder = document.getElementById('canvas-holder');
   holder.innerHTML = '';
@@ -317,13 +370,13 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
   const BATCH = 80;
 
   function drawStep() {
-    const end = Math.min(i + BATCH, n);
+    const end = Math.min(i + BATCH, total);
     for (; i < end; i++) {
       const col = i % cols;
       const row = Math.floor(i / cols);
-      ctx.putImageData(tiles[i].imgData, col * tileW, row * tileH);
+      ctx.putImageData(tiles[i % n].imgData, col * tileW, row * tileH);
     }
-    if (i < n) {
+    if (i < total) {
       setTimeout(drawStep, 0);
     } else if (onDone) {
       onDone();
@@ -331,6 +384,142 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
   }
   drawStep();
 }
+
+// ---------------------------------------------------------------------
+// Carga automática de fondo: en "modo fondo de home" el panel de
+// controles está oculto (ver style.css), así que en vez de esperar a
+// que alguien arrastre fotos, cargamos directamente las imágenes que
+// están en assets/imagenes y armamos el mosaico apenas terminan de
+// cargar. Si sumás o sacás fotos de esa carpeta, actualizá esta lista.
+// ---------------------------------------------------------------------
+const ASSET_IMAGE_PATHS = [
+  'assets/imagenes/otono-07.jpg',
+  'assets/imagenes/otono-08.jpg',
+  'assets/imagenes/otono-09.jpg',
+  'assets/imagenes/otono-10.jpeg',
+  'assets/imagenes/otono-11.jpeg',
+  'assets/imagenes/otono-12.jpeg',
+];
+
+function loadAssetBackground() {
+  let settled = 0;
+  ASSET_IMAGE_PATHS.forEach(path => {
+    const img = new Image();
+    const onSettle = () => {
+      settled++;
+      updateCount();
+      if (settled === ASSET_IMAGE_PATHS.length && uploadedImages.length > 0) {
+        buildMosaic();
+      }
+    };
+    img.onload = () => {
+      uploadedImages.push(img);
+      const t = document.createElement('img');
+      t.src = path;
+      thumbrow.appendChild(t);
+      onSettle();
+    };
+    img.onerror = () => {
+      console.error('No se pudo cargar la imagen de fondo:', path);
+      onSettle();
+    };
+    img.src = path;
+  });
+}
+
+loadAssetBackground();
+
+// ---------------------------------------------------------------------
+// Poema flotante: carga los poemas de la estación actual desde su YAML
+// (assets/poemas/<estacion>.yaml) y los va mostrando en loop, arriba a
+// la izquierda, como una pila de frases, cada una con su propio
+// destacado (recuadro blanco ajustado al texto, no una tarjeta única).
+// Las frases se escriben en cascada: cada una aparece palabra por
+// palabra y recién cuando termina empieza a escribirse la siguiente.
+// Cuando el poema completo terminó de escribirse, se borra y, tras una
+// pausa, empieza a escribirse otro (sin repetir el que se acaba de ver).
+// ---------------------------------------------------------------------
+const CURRENT_SEASON = 'otono';
+const poemCard = document.getElementById('poemCard');
+const WORD_STEP_MS = 55;
+const WORD_REVEAL_MS = 350; // debe coincidir con la duración de la animación .word-in en CSS
+const PAUSE_BETWEEN_FRASES_MS = 260;
+const PAUSE_BETWEEN_POEMS_MS = 5000;
+
+let seasonPoems = [];
+let lastPoemIndex = -1;
+
+// Escribe el poema y devuelve cuánto tarda (ms) en quedar completamente visible.
+function renderPoem(poem) {
+  poemCard.innerHTML = '';
+
+  const frases = [];
+  if (poem.titulo) frases.push({ text: poem.titulo, titulo: true });
+  (poem.texto || '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .forEach(line => frases.push({ text: line, titulo: false }));
+
+  let cumulativeMs = 0;
+  frases.forEach((frase, i) => {
+    const wrap = document.createElement('span');
+    wrap.className = 'frase' + (frase.titulo ? ' frase-titulo' : '');
+    wrap.style.animationDelay = cumulativeMs + 'ms';
+
+    const words = frase.text.split(' ');
+    words.forEach((word, idx) => {
+      const span = document.createElement('span');
+      span.className = 'word';
+      span.textContent = word;
+      span.style.animationDelay = (cumulativeMs + idx * WORD_STEP_MS) + 'ms';
+      wrap.appendChild(span);
+      if (idx < words.length - 1) wrap.appendChild(document.createTextNode(' '));
+    });
+
+    poemCard.appendChild(wrap);
+    cumulativeMs += words.length * WORD_STEP_MS;
+    if (i < frases.length - 1) cumulativeMs += PAUSE_BETWEEN_FRASES_MS;
+  });
+
+  return cumulativeMs + WORD_REVEAL_MS;
+}
+
+function pickNextPoemIndex() {
+  if (seasonPoems.length <= 1) return 0;
+  let idx;
+  do {
+    idx = Math.floor(Math.random() * seasonPoems.length);
+  } while (idx === lastPoemIndex);
+  return idx;
+}
+
+function playNextPoem() {
+  if (seasonPoems.length === 0) return;
+  lastPoemIndex = pickNextPoemIndex();
+  const durationMs = renderPoem(seasonPoems[lastPoemIndex]);
+  // Al terminar de escribirse, el poema se queda visible un rato antes de
+  // borrarse y dar paso al siguiente.
+  setTimeout(() => {
+    poemCard.innerHTML = '';
+    playNextPoem();
+  }, durationMs + PAUSE_BETWEEN_POEMS_MS);
+}
+
+function loadSeasonPoem(season) {
+  if (!poemCard || typeof jsyaml === 'undefined') return;
+  fetch('assets/poemas/' + season + '.yaml')
+    .then(res => res.text())
+    .then(yamlText => {
+      const poems = jsyaml.load(yamlText);
+      if (!Array.isArray(poems) || poems.length === 0) return;
+      seasonPoems = poems;
+      playNextPoem();
+    })
+    .catch(err => console.error('No se pudo cargar el poema:', err));
+}
+
+loadSeasonPoem(CURRENT_SEASON);
 
 function renderFlowMosaic(tiles, rowHeight, minWidth, maxWidth, onDone) {
   // Fixed-height row flow: tiles keep whatever width they were extracted at
