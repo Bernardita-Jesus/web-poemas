@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mosaico por color</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="panel">
+    <div>
+      <h1>Mosaico por color</h1>
+      <p class="sub">Subí una o más fotos. Cada una se corta en recortes (tamaño fijo o con ancho variado) y todos los recortes se reordenan en una sola grilla, agrupados por color.</p>
+    </div>
+
+    <div class="field">
+      <label>Imágenes</label>
+      <div class="dropzone" id="dropzone">
+        Arrastrá tus fotos acá, o hacé clic para elegirlas
+        <input type="file" id="fileInput" accept="image/*" multiple>
+      </div>
+      <div class="thumbrow" id="thumbrow"></div>
+      <span class="count" id="imgCount"></span>
+    </div>
+
+    <div class="field checkbox-field">
+      <label class="checkbox-label">
+        <input type="checkbox" id="variableSizes">
+        Anchos variados (alto fijo)
+      </label>
+    </div>
+
+    <div id="fixedSizeControls">
+      <div class="field">
+        <label>Ancho del recorte: <span class="rangeval" id="tileWVal">160</span> px</label>
+        <input type="range" id="tileW" min="60" max="260" value="160" step="2">
+      </div>
+
+      <div class="field">
+        <label>Alto del recorte: <span class="rangeval" id="tileHVal">160</span> px</label>
+        <input type="range" id="tileH" min="60" max="200" value="160" step="2">
+      </div>
+    </div>
+
+    <div id="variableSizeControls" style="display:none;">
+      <div class="field">
+        <label>Alto fijo: <span class="rangeval" id="rowHeightVal">160</span> px</label>
+        <input type="range" id="rowHeight" min="8" max="300" value="160" step="2">
+      </div>
+      <div class="field">
+        <label>Ancho mínimo: <span class="rangeval" id="minWidthVal">36</span> px</label>
+        <input type="range" id="minWidth" min="20" max="90" value="36" step="2">
+      </div>
+      <div class="field">
+        <label>Ancho máximo: <span class="rangeval" id="maxWidthVal">160</span> px</label>
+        <input type="range" id="maxWidth" min="100" max="300" value="160" step="2">
+      </div>
+      <p class="sub" style="margin-top:-4px;">El alto de cada recorte no cambia; solo el ancho varía entre el mínimo y el máximo.</p>
+    </div>
+
+    <div class="field">
+      <label>Ordenar por</label>
+      <select id="sortMode">
+        <option value="hue">Tono (arcoíris)</option>
+        <option value="brightness">Brillo (claro → oscuro)</option>
+        <option value="saturation">Saturación</option>
+        <option value="hue-bright">Tono, luego brillo</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Aleatoriedad: <span class="rangeval" id="jitterVal">35</span>%</label>
+      <input type="range" id="jitter" min="0" max="100" value="35" step="1">
+    </div>
+
+    <div class="field">
+      <button class="primary" id="processBtn" disabled>Armar mosaico</button>
+      <button class="secondary" id="downloadBtn" disabled>Descargar imagen</button>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div id="canvas-holder"></div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
