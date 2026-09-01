@@ -430,80 +430,72 @@ function loadAssetBackground() {
 loadAssetBackground();
 
 // ---------------------------------------------------------------------
-// Poema flotante: carga los poemas de la estación actual desde su YAML
-// (assets/poemas/<estacion>.yaml) y los va mostrando en loop, arriba a
-// la izquierda, como una pila de frases, cada una con su propio
-// destacado (recuadro blanco ajustado al texto, no una tarjeta única).
-// Las frases se escriben en cascada: cada una aparece palabra por
-// palabra y recién cuando termina empieza a escribirse la siguiente.
-// Cuando el poema completo terminó de escribirse, se borra y, tras una
-// pausa, empieza a escribirse otro (sin repetir el que se acaba de ver).
+// Lectura de poemas: carga los poemas de la estación actual desde su
+// YAML (assets/poemas/<estacion>.yaml), los ordena por fecha y los
+// muestra en una columna, cada uno con su fecha. El mosaico queda fijo
+// de fondo (ver style.css) y cada poema aparece con un fundido cuando
+// entra en pantalla al hacer scroll. Sin efecto de escritura.
 // ---------------------------------------------------------------------
 const CURRENT_SEASON = 'otono';
 const poemCard = document.getElementById('poemCard');
-const WORD_STEP_MS = 55;
-const WORD_REVEAL_MS = 350; // debe coincidir con la duración de la animación .word-in en CSS
-const PAUSE_BETWEEN_FRASES_MS = 260;
-const PAUSE_BETWEEN_POEMS_MS = 5000;
 
-let seasonPoems = [];
-let lastPoemIndex = -1;
-
-// Escribe el poema y devuelve cuánto tarda (ms) en quedar completamente visible.
-function renderPoem(poem) {
+function renderPoemList(poems) {
   poemCard.innerHTML = '';
 
-  const frases = [];
-  if (poem.titulo) frases.push({ text: poem.titulo, titulo: true });
-  (poem.texto || '')
-    .split('\n')
-    .map(line => line.trim())
-    .filter(Boolean)
-    .forEach(line => frases.push({ text: line, titulo: false }));
+  poems
+    .slice()
+    .sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
+    .forEach(poem => {
+      const article = document.createElement('article');
+      article.className = 'poem';
 
-  let cumulativeMs = 0;
-  frases.forEach((frase, i) => {
-    const wrap = document.createElement('span');
-    wrap.className = 'frase' + (frase.titulo ? ' frase-titulo' : '');
-    wrap.style.animationDelay = cumulativeMs + 'ms';
+      if (poem.fecha_texto) {
+        const fecha = document.createElement('div');
+        fecha.className = 'poem-fecha';
+        fecha.textContent = poem.fecha_texto;
+        article.appendChild(fecha);
+      }
 
-    const words = frase.text.split(' ');
-    words.forEach((word, idx) => {
-      const span = document.createElement('span');
-      span.className = 'word';
-      span.textContent = word;
-      span.style.animationDelay = (cumulativeMs + idx * WORD_STEP_MS) + 'ms';
-      wrap.appendChild(span);
-      if (idx < words.length - 1) wrap.appendChild(document.createTextNode(' '));
+      if (poem.titulo) {
+        const titulo = document.createElement('h2');
+        titulo.className = 'poem-titulo';
+        titulo.textContent = poem.titulo;
+        article.appendChild(titulo);
+      }
+
+      (poem.texto || '')
+        .split('\n')
+        .map(line => line.trim())
+        .filter(Boolean)
+        .forEach(line => {
+          const p = document.createElement('p');
+          p.className = 'poem-linea';
+          p.textContent = line;
+          article.appendChild(p);
+        });
+
+      poemCard.appendChild(article);
     });
 
-    poemCard.appendChild(wrap);
-    cumulativeMs += words.length * WORD_STEP_MS;
-    if (i < frases.length - 1) cumulativeMs += PAUSE_BETWEEN_FRASES_MS;
-  });
-
-  return cumulativeMs + WORD_REVEAL_MS;
+  revealOnScroll();
 }
 
-function pickNextPoemIndex() {
-  if (seasonPoems.length <= 1) return 0;
-  let idx;
-  do {
-    idx = Math.floor(Math.random() * seasonPoems.length);
-  } while (idx === lastPoemIndex);
-  return idx;
-}
-
-function playNextPoem() {
-  if (seasonPoems.length === 0) return;
-  lastPoemIndex = pickNextPoemIndex();
-  const durationMs = renderPoem(seasonPoems[lastPoemIndex]);
-  // Al terminar de escribirse, el poema se queda visible un rato antes de
-  // borrarse y dar paso al siguiente.
-  setTimeout(() => {
-    poemCard.innerHTML = '';
-    playNextPoem();
-  }, durationMs + PAUSE_BETWEEN_POEMS_MS);
+// Muestra cada poema con un fundido cuando entra en el viewport.
+function revealOnScroll() {
+  const items = poemCard.querySelectorAll('.poem');
+  if (!('IntersectionObserver' in window)) {
+    items.forEach(el => el.classList.add('visible'));
+    return;
+  }
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        io.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.2, rootMargin: '0px 0px -10% 0px' });
+  items.forEach(el => io.observe(el));
 }
 
 function loadSeasonPoem(season) {
@@ -513,10 +505,9 @@ function loadSeasonPoem(season) {
     .then(yamlText => {
       const poems = jsyaml.load(yamlText);
       if (!Array.isArray(poems) || poems.length === 0) return;
-      seasonPoems = poems;
-      playNextPoem();
+      renderPoemList(poems);
     })
-    .catch(err => console.error('No se pudo cargar el poema:', err));
+    .catch(err => console.error('No se pudieron cargar los poemas:', err));
 }
 
 loadSeasonPoem(CURRENT_SEASON);

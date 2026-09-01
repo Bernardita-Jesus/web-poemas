@@ -16,7 +16,7 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: 'IBM Plex Sans', sans-serif;
-  height: 100%;
+  min-height: 100%;
 }
 
 .wrap {
@@ -214,47 +214,78 @@ button.secondary:disabled {
   display: block;
 }
 
+/* ---------------------------------------------------------------------
+   Lectura de poemas: el mosaico queda fijo como fondo y los poemas de
+   la estación se leen en una columna que se desplaza por encima,
+   ordenados por fecha. Cada poema aparece con un fundido cuando entra
+   en pantalla al hacer scroll (sin efecto de escritura).
+--------------------------------------------------------------------- */
+.stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
 .poem-card {
-  position: absolute;
-  top: 16px;
-  left: 16px;
+  position: relative;
   z-index: 5;
-  max-width: min(460px, calc(100vw - 32px));
+  margin: 0 auto;
+  max-width: 640px;
+  padding: 26vh 24px 40vh;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
+  gap: 18vh;
 }
 .poem-card:empty {
   display: none;
 }
-.poem-card .frase {
-  display: inline-block;
+
+.poem {
+  align-self: flex-start;
+  max-width: min(460px, calc(100vw - 48px));
   background: #ffffff;
   color: #000000;
-  padding: 7px 12px;
-  border-radius: 3px;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, .18);
+  padding: 20px 22px;
+  border-radius: 4px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .22);
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity .8s ease, transform .8s ease;
+}
+.poem.visible {
+  opacity: 1;
+  transform: none;
+}
+
+.poem-fecha {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #8a7a3f;
+  margin-bottom: 12px;
+}
+
+.poem-titulo {
+  font-family: 'Source Serif 4', serif;
+  font-weight: 600;
+  font-size: 19px;
+  margin: 0 0 10px 0;
+}
+
+.poem-linea {
   font-family: 'Source Serif 4', serif;
   font-size: 17px;
-  line-height: 1.5;
-  opacity: 0;
-  animation: frase-in .01s linear forwards;
+  line-height: 1.55;
+  margin: 0;
 }
-.poem-card .frase-titulo {
-  font-weight: 600;
-}
-.poem-card .word {
-  display: inline-block;
-  opacity: 0;
-  transform: translateY(6px);
-  animation: word-in .35s ease forwards;
-}
-@keyframes frase-in {
-  to { opacity: 1; }
-}
-@keyframes word-in {
-  to { opacity: 1; transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .poem {
+    transition: opacity .3s ease;
+    transform: none;
+  }
 }
 
 .bg-toolbar {
