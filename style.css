@@ -241,7 +241,7 @@ body {
 
 .poem {
   pointer-events: auto;
-  max-width: min(520px, 78vw);
+  max-width: min(680px, 90vw);
   color: #ffffff;
   text-shadow: 0 2px 4px rgba(0, 0, 0, .55), 0 1px 20px rgba(0, 0, 0, .6);
   opacity: 0;
@@ -294,44 +294,17 @@ body {
 }
 
 /* ---------------------------------------------------------------------
-   Grano: textura de ruido animada por encima del mosaico y por debajo
-   de los poemas (z-index 4, entre la capa de fotos y el texto). El
-   pseudo-elemento es más grande que la pantalla para que el temblor no
-   deje bordes vacíos.
+   Capa sobre las fotos: un velo translúcido por encima del mosaico y
+   por debajo de los poemas (z-index 4). Baja un poco la intensidad de
+   la imagen y ayuda a que el texto blanco se lea.
 --------------------------------------------------------------------- */
 body::after {
   content: "";
   position: fixed;
-  top: -100%;
-  left: -100%;
-  width: 300%;
-  height: 300%;
+  inset: 0;
   z-index: 4;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 140px 140px;
-  opacity: .32;
-  mix-blend-mode: overlay;
-  animation: grain-shift .7s steps(1) infinite;
-}
-
-@keyframes grain-shift {
-  0%   { transform: translate(0, 0); }
-  10%  { transform: translate(-4%, -8%); }
-  20%  { transform: translate(-12%, 4%); }
-  30%  { transform: translate(6%, -20%); }
-  40%  { transform: translate(-4%, 18%); }
-  50%  { transform: translate(-12%, 8%); }
-  60%  { transform: translate(12%, 0); }
-  70%  { transform: translate(0, 12%); }
-  80%  { transform: translate(3%, 28%); }
-  90%  { transform: translate(-8%, 8%); }
-  100% { transform: translate(0, 0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  body::after { animation: none; }
+  background: rgba(30, 22, 8, .22);
 }
 
 .bg-toolbar {
