@@ -2,9 +2,7 @@ let uploadedImages = [];
 let mosaicCanvas = null;
 
 // Recortes ya calculados (color, brillo, imgData) del último mosaico armado,
-// y el layout con el que se dibujaron — se guardan para poder reordenar
-// (botones "Ordenar por brillo" / "Aleatorizar") sin repetir todo el
-// procesamiento de imágenes, que es la parte lenta.
+// y el layout con el que se dibujaron.
 let currentTiles = [];
 let currentLayout = null;
 
@@ -30,8 +28,11 @@ const maxWidthVal = document.getElementById('maxWidthVal');
 const sortMode = document.getElementById('sortMode');
 const jitterSlider = document.getElementById('jitter');
 const jitterVal = document.getElementById('jitterVal');
-const sortBrightnessBtn = document.getElementById('sortBrightnessBtn');
-const shuffleBtn = document.getElementById('shuffleBtn');
+
+// Único ordenamiento del mosaico: por brillo, de claro a oscuro, con una
+// pizca de aleatoriedad para que las bandas no queden perfectamente lisas.
+const SORT_MODE = 'brightness';
+const SORT_JITTER = 0.15;
 
 variableSizesCheckbox.addEventListener('change', () => {
   const on = variableSizesCheckbox.checked;
@@ -273,9 +274,7 @@ function buildMosaic() {
   }
 
   function sortAndRender() {
-    const mode = sortMode.value;
-    const jitterAmount = parseInt(jitterSlider.value, 10) / 100; // 0..1
-    applySort(tiles, mode, jitterAmount);
+    applySort(tiles, SORT_MODE, SORT_JITTER);
 
     currentTiles = tiles;
     currentLayout = { variable, tileW, tileH, rowHeight, minWidth, maxWidth };
@@ -328,22 +327,6 @@ function renderCurrentTiles(onDone) {
   }
 }
 
-sortBrightnessBtn.addEventListener('click', () => {
-  if (currentTiles.length === 0) return;
-  applySort(currentTiles, 'brightness', 0);
-  renderCurrentTiles(() => {
-    imgCount.textContent = currentTiles.length + ' recortes armados.';
-  });
-});
-
-shuffleBtn.addEventListener('click', () => {
-  if (currentTiles.length === 0) return;
-  applySort(currentTiles, 'shuffle', 0);
-  renderCurrentTiles(() => {
-    imgCount.textContent = currentTiles.length + ' recortes armados.';
-  });
-});
-
 function renderFixedMosaic(tiles, tileW, tileH, onDone) {
   const n = tiles.length;
   // Ancho fijo (pensado para pantalla); las filas necesarias se apilan hacia
@@ -352,7 +335,7 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
   const TARGET_WIDTH = 1600;
   const cols = Math.max(1, Math.round(TARGET_WIDTH / tileW));
   const rows = Math.ceil(n / cols);
-  const total = rows * cols; // may be > n; leftover cells recycle tiles below so no cell is left blank
+  const total = rows * cols; // suele ser > n; las celdas sobrantes de la última fila se rellenan reflejando el final del array (ver más abajo)
 
   const holder = document.getElementById('canvas-holder');
   holder.innerHTML = '';
@@ -374,7 +357,13 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
     for (; i < end; i++) {
       const col = i % cols;
       const row = Math.floor(i / cols);
-      ctx.putImageData(tiles[i % n].imgData, col * tileW, row * tileH);
+      // Para las celdas sobrantes de la última fila (i >= n) reflejamos hacia
+      // atrás desde el final del array en vez de volver al principio: así el
+      // relleno usa los recortes más oscuros, que es donde termina el degradado,
+      // y no los más claros del arranque.
+      let idx = i;
+      if (idx >= n) idx = Math.max(0, 2 * n - 1 - idx);
+      ctx.putImageData(tiles[idx].imgData, col * tileW, row * tileH);
     }
     if (i < total) {
       setTimeout(drawStep, 0);
@@ -445,9 +434,13 @@ function renderPoemList(poems) {
   poems
     .slice()
     .sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
-    .forEach(poem => {
+    .forEach((poem, poemIndex) => {
       const article = document.createElement('article');
       article.className = 'poem';
+      // Poemas impares (1º, 3º…) van pegados a la izquierda; los pares a la
+      // derecha (ver .poem:nth-child en style.css). El escalonado diagonal
+      // tiene que correrse hacia el lado contrario al margen de cada uno.
+      const alignRight = poemIndex % 2 === 1;
 
       if (poem.fecha_texto) {
         const fecha = document.createElement('div');
@@ -463,15 +456,36 @@ function renderPoemList(poems) {
         article.appendChild(titulo);
       }
 
+      // Escalonado diagonal: cada línea de una frase encabalgada se corre un
+      // escalón más adentro que la anterior. La frase "abre" en cuanto una
+      // línea NO termina en coma, dos puntos, punto y coma o punto, y sigue
+      // escalonando en cada línea siguiente —incluida la que finalmente cierra
+      // con esos signos, que arrastra la distancia acumulada— hasta que después
+      // de esa línea de cierre se vuelve al margen.
+      const STEP_EM = 1.6;          // ancho de cada escalón
+      const MAX_LEVEL = 8;          // tope para que no se escape del recuadro
+      const CIERRA = /[,;:.]$/;     // signos que cortan la diagonal
+      let level = 0;
+      let vieneAbierta = false;     // la línea anterior quedó sin cerrar
+
       (poem.texto || '')
         .split('\n')
         .map(line => line.trim())
         .filter(Boolean)
         .forEach(line => {
+          const cierra = CIERRA.test(line.replace(/["'»)\]]+$/, ''));
+          if (!cierra || vieneAbierta) level = Math.min(level + 1, MAX_LEVEL);
+
           const p = document.createElement('p');
           p.className = 'poem-linea';
           p.textContent = line;
+          if (level > 0) {
+            p.style[alignRight ? 'marginRight' : 'marginLeft'] = (level * STEP_EM) + 'em';
+          }
           article.appendChild(p);
+
+          vieneAbierta = !cierra;
+          if (cierra) level = 0;
         });
 
       poemCard.appendChild(article);
