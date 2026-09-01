@@ -304,7 +304,7 @@ body::after {
   inset: 0;
   z-index: 4;
   pointer-events: none;
-  background: rgba(232, 245, 230, .38);
+  background: rgba(232, 245, 230, .28);
 }
 
 .bg-toolbar {
