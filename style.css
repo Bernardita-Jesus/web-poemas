@@ -17,6 +17,7 @@ html, body {
   color: var(--text);
   font-family: 'IBM Plex Sans', sans-serif;
   min-height: 100%;
+  overflow-x: hidden;
 }
 
 .wrap {
@@ -204,12 +205,12 @@ button.secondary:disabled {
 #canvas-holder {
   box-shadow: none;
   background: transparent;
-  width: 100vw;
+  width: 100%;
 }
 #canvas-holder canvas {
-  width: 100vw;
+  width: 100%;
   height: auto;
-  max-width: none;
+  max-width: 100%;
   border-radius: 0;
   display: block;
 }
@@ -294,9 +295,16 @@ body {
 }
 
 /* ---------------------------------------------------------------------
-   Capa sobre las fotos: un velo translúcido blanco verdoso por encima
+   Capa sobre las fotos: un velo translúcido blanco turquesa por encima
    del mosaico y por debajo de los poemas (z-index 4). Aclara la imagen
-   dándole un tinte verde suave.
+   dándole un tinte turquesa suave.
+
+   Degradé vertical: el velo es más tenue arriba y se va cerrando hacia
+   abajo, dejando la imagen más nítida en la parte superior.
+
+   Si NO se quiere usar el degradado, reemplazar el linear-gradient por
+   un color plano con opacidad .15:
+     background: rgba(206, 242, 230, .15);
 --------------------------------------------------------------------- */
 body::after {
   content: "";
@@ -304,6 +312,11 @@ body::after {
   inset: 0;
   z-index: 4;
   pointer-events: none;
-  background: rgba(232, 245, 230, .15);
+  background: linear-gradient(
+    to bottom,
+    rgba(206, 242, 230, .10) 0%,
+    rgba(206, 242, 230, .15) 50%,
+    rgba(206, 242, 230, .25) 100%
+  );
 }
 
