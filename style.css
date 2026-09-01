@@ -219,8 +219,15 @@ button.secondary:disabled {
    Lectura de poemas: el mosaico se ve completo al hacer scroll (no está
    fijo). Los poemas van por encima, repartidos de arriba a abajo a lo
    largo del mosaico y ordenados por fecha, sin recuadro: solo el texto
-   sobre la imagen. Cada poema aparece con un fundido cuando entra en
-   pantalla al bajar (sin efecto de escritura).
+   sobre la imagen. Cada poema entra con un fundido cuando aparece en
+   pantalla.
+
+   Encima de ese fundido va, opcional, el efecto escritura: el título y
+   los versos se teclean letra por letra con un cursor parpadeante (ver
+   el bloque "EFECTO ESCRITURA" en script.js, con su interruptor
+   EFECTO_ESCRITURA, y el bloque "efecto escritura" de más abajo con el
+   estilo del cursor). Si se desactiva desde script.js, este CSS queda
+   inerte: la clase .typing nunca se agrega.
 --------------------------------------------------------------------- */
 body {
   position: relative;
@@ -253,13 +260,16 @@ body {
   opacity: 1;
   transform: none;
 }
+/* Cada poema arranca cerca del borde del mosaico: los impares pegados
+   al primer cuadrado (izquierda) y los pares al último (derecha). Subir
+   este margen los aleja del borde; bajarlo los pega más. */
 .poem:nth-child(odd) {
   align-self: flex-start;
-  margin-left: 7vw;
+  margin-left: 4vw;
 }
 .poem:nth-child(even) {
   align-self: flex-end;
-  margin-right: 7vw;
+  margin-right: 4vw;
   text-align: right;
 }
 
@@ -285,6 +295,28 @@ body {
   font-size: 20px;
   line-height: 1.6;
   margin: 0;
+  /* efecto escritura: reserva el alto de un renglón aunque el verso
+     todavía esté vacío, para que el texto que va apareciendo no empuje
+     el resto del poema hacia abajo de golpe. */
+  min-height: 1.6em;
+}
+
+/* ---------------------------------------------------------------------
+   efecto escritura: mientras un renglón (título o verso) se está
+   tecleando lleva la clase .typing y esto le dibuja un cursor
+   parpadeante al final. startTypewriter (script.js) agrega y saca esa
+   clase a medida que avanza.
+--------------------------------------------------------------------- */
+.poem .typing::after {
+  content: "▍";
+  display: inline-block;
+  margin-left: 1px;
+  color: rgba(255, 255, 255, .9);
+  animation: caret-blink 1s steps(1, end) infinite;
+}
+@keyframes caret-blink {
+  0%, 45% { opacity: 1; }
+  50%, 100% { opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -292,6 +324,9 @@ body {
     transition: opacity .3s ease;
     transform: none;
   }
+  /* efecto escritura: sin animación de tecleo ni cursor (startTypewriter
+     vuelca el texto completo de una). */
+  .poem .typing::after { display: none; }
 }
 
 /* ---------------------------------------------------------------------

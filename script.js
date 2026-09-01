@@ -422,11 +422,86 @@ loadAssetBackground();
 // Lectura de poemas: carga los poemas de la estación actual desde su
 // YAML (assets/poemas/<estacion>.yaml), los ordena por fecha y los
 // muestra en una columna, cada uno con su fecha. El mosaico queda fijo
-// de fondo (ver style.css) y cada poema aparece con un fundido cuando
-// entra en pantalla al hacer scroll. Sin efecto de escritura.
+// de fondo (ver style.css) y cada poema entra con un fundido cuando
+// aparece en pantalla al hacer scroll.
 // ---------------------------------------------------------------------
 const CURRENT_SEASON = 'otono';
 const poemCard = document.getElementById('poemCard');
+
+// =====================================================================
+// EFECTO ESCRITURA (opcional)
+// ---------------------------------------------------------------------
+// Cuando un poema entra en pantalla, su título y sus versos no aparecen
+// de golpe: se "teclean" letra por letra, uno abajo del otro, con un
+// cursor parpadeante al final de la línea que se está escribiendo.
+//
+// PARA DESACTIVARLO: poné EFECTO_ESCRITURA en false. Los poemas siguen
+// entrando con el fundido de siempre, pero con el texto completo desde
+// el arranque (sin tecleo ni cursor). No hace falta tocar nada más.
+//
+// El efecto también se apaga solo si el sistema pide menos movimiento
+// (prefers-reduced-motion).
+//
+// Para ajustar el ritmo sin desactivarlo, tocá los tres tiempos de
+// abajo (en milisegundos):
+//   TYPE_CHAR_MS       - lo que tarda cada letra (más alto = más lento)
+//   TYPE_LINE_PAUSE    - pausa al saltar de un verso al siguiente
+//   TYPE_SENTENCE_PAUSE- pausa más larga al toparse con un punto, para
+//                        que la lectura respire al cerrar una oración
+// =====================================================================
+const EFECTO_ESCRITURA = true;
+
+const TYPE_CHAR_MS = 40;
+const TYPE_LINE_PAUSE = 340;
+const TYPE_SENTENCE_PAUSE = 1150;
+const PUNTO = /[.!?…]/;          // corta el ritmo dondequiera que aparezca
+const FIN_ORACION = /[.!?…]$/;   // el verso cierra una oración
+const prefersReducedMotion = !!(window.matchMedia &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+// efecto escritura: recorre en orden los elementos "tecleables" del poema
+// (título y versos, guardados en article._typeTargets con su texto en
+// dataset.full) y va escribiendo cada uno carácter a carácter. Mientras
+// una línea se teclea lleva la clase .typing, que en style.css le dibuja
+// un cursor parpadeante al final. Con el efecto desactivado (o si el
+// sistema pide menos movimiento) se vuelca el texto completo sin animar.
+function startTypewriter(article) {
+  const targets = (article && article._typeTargets) || [];
+  if (targets.length === 0) return;
+
+  if (!EFECTO_ESCRITURA || prefersReducedMotion) {
+    targets.forEach(el => { el.textContent = el.dataset.full || ''; });
+    return;
+  }
+
+  let ti = 0;
+  function typeElement() {
+    if (ti >= targets.length) return;
+    const el = targets[ti];
+    const full = el.dataset.full || '';
+    el.classList.add('typing');
+    let ci = 0;
+    (function typeChar() {
+      el.textContent = full.slice(0, ci);
+      if (ci < full.length) {
+        // efecto escritura: si la letra recién tecleada fue un punto y
+        // todavía queda verso por delante, frená un momento antes de seguir.
+        const recien = ci > 0 ? full[ci - 1] : '';
+        const trasPunto = recien && PUNTO.test(recien);
+        ci++;
+        setTimeout(typeChar, trasPunto ? TYPE_SENTENCE_PAUSE : TYPE_CHAR_MS);
+      } else {
+        el.classList.remove('typing');
+        ti++;
+        // efecto escritura: pausa larga si el verso cierra una oración,
+        // pausa corta si solo es un salto de línea dentro de la frase.
+        const cierraOracion = FIN_ORACION.test(full.replace(/["'»)\]]+$/, ''));
+        setTimeout(typeElement, cierraOracion ? TYPE_SENTENCE_PAUSE : TYPE_LINE_PAUSE);
+      }
+    })();
+  }
+  typeElement();
+}
 
 function renderPoemList(poems) {
   poemCard.innerHTML = '';
@@ -437,6 +512,8 @@ function renderPoemList(poems) {
     .forEach((poem, poemIndex) => {
       const article = document.createElement('article');
       article.className = 'poem';
+      // efecto escritura: elementos que se van a teclear, en orden.
+      const typeTargets = [];
       // Poemas impares (1º, 3º…) van pegados a la izquierda; los pares a la
       // derecha (ver .poem:nth-child en style.css). El escalonado diagonal
       // tiene que correrse hacia el lado contrario al margen de cada uno.
@@ -452,8 +529,11 @@ function renderPoemList(poems) {
       if (poem.titulo) {
         const titulo = document.createElement('h2');
         titulo.className = 'poem-titulo';
-        titulo.textContent = poem.titulo;
+        // efecto escritura: el texto real queda en dataset.full y el
+        // elemento arranca vacío; startTypewriter lo va llenando.
+        titulo.dataset.full = poem.titulo;
         article.appendChild(titulo);
+        typeTargets.push(titulo);
       }
 
       // Escalonado diagonal: cada línea de una frase encabalgada se corre un
@@ -478,33 +558,44 @@ function renderPoemList(poems) {
 
           const p = document.createElement('p');
           p.className = 'poem-linea';
-          p.textContent = line;
+          // efecto escritura: el verso arranca vacío; su texto vive en
+          // dataset.full hasta que startTypewriter lo teclea.
+          p.dataset.full = line;
           if (level > 0) {
             p.style[alignRight ? 'marginRight' : 'marginLeft'] = (level * STEP_EM) + 'em';
           }
           article.appendChild(p);
+          typeTargets.push(p);
 
           vieneAbierta = !cierra;
           if (cierra) level = 0;
         });
 
+      // efecto escritura: se dispara cuando el poema entra en pantalla
+      // (ver revealOnScroll).
+      article._typeTargets = typeTargets;
       poemCard.appendChild(article);
     });
 
   revealOnScroll();
 }
 
-// Muestra cada poema con un fundido cuando entra en el viewport.
+// Muestra cada poema con un fundido cuando entra en el viewport y, al
+// mismo tiempo, arranca el efecto escritura sobre su título y sus versos.
 function revealOnScroll() {
   const items = poemCard.querySelectorAll('.poem');
   if (!('IntersectionObserver' in window)) {
-    items.forEach(el => el.classList.add('visible'));
+    items.forEach(el => {
+      el.classList.add('visible');
+      startTypewriter(el);
+    });
     return;
   }
   const io = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
         entry.target.classList.add('visible');
+        startTypewriter(entry.target);
         io.unobserve(entry.target);
       }
     });
