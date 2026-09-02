@@ -1131,15 +1131,21 @@ loadSeasonPoem(CURRENT_SEASON);
 // style.css).
 //
 // Ajustes:
-//   TEXTURAS_CICLO_MS - solo modo 'constante': cuánto tarda una foto en
-//                       cruzar toda la pantalla una vez (ms). Más alto =
-//                       cruce más lento.
+//   TEXTURAS_SCROLL_TRAMO - solo modo 'scroll': en cuántas pantallas de
+//                           scroll se completa el cruce de una foto. Más
+//                           alto = la foto se desliza más lento (hay que
+//                           scrollear más para que cruce). 1 = el cruce
+//                           entra justo en una pantalla.
+//   TEXTURAS_CICLO_MS     - solo modo 'constante': cuánto tarda una foto
+//                           en cruzar toda la pantalla una vez (ms). Más
+//                           alto = cruce más lento.
 //
 // Se apaga solo si el sistema pide menos movimiento
 // (prefers-reduced-motion): las fotos quedan quietas en su lugar.
 // =====================================================================
 const EFECTO_TEXTURAS = true;
 const TEXTURAS_MODO = 'scroll'; // 'scroll' | 'constante'
+const TEXTURAS_SCROLL_TRAMO = 2;
 const TEXTURAS_IMAGE_PATHS = [
   'assets/imagenes/textura-otono-01.jpeg',
   'assets/imagenes/textura-otono-02.jpeg',
@@ -1223,10 +1229,12 @@ function iniciarDeslizConstante() {
 }
 
 // efecto texturas, modo 'scroll': el `p` de cada foto sale de qué tan
-// arriba del viewport va su centro. Centro en el borde de abajo → p = 0
-// (recién asomando por un costado); centro en el borde de arriba → p = 1
-// (terminó de cruzar). Entre medio, la foto avanza su cruce a medida que
-// scrolleás; con el scroll parado no se mueve.
+// arriba del viewport va su centro, repartido en TEXTURAS_SCROLL_TRAMO
+// pantallas de scroll. El cruce arranca cuando la foto todavía está
+// media pantalla por debajo del borde inferior (p = 0) y termina cuando
+// ya pasó media pantalla del borde superior (p = 1); cuanto más grande
+// el tramo, más scroll hace falta para cruzar y más lento se desliza.
+// Con el scroll parado no se mueve.
 function iniciarDeslizScroll() {
   const slides = Array.from(texturaCapa.querySelectorAll('.textura-slide'));
   if (slides.length === 0) return;
@@ -1236,15 +1244,20 @@ function iniciarDeslizScroll() {
     return;
   }
 
+  const tramo = Math.max(1, TEXTURAS_SCROLL_TRAMO);
   let ticking = false;
   function actualizar() {
     ticking = false;
     const vh = window.innerHeight || document.documentElement.clientHeight;
     const anchoCapa = texturaCapa.clientWidth || window.innerWidth;
+    // ventana de scroll (en px) donde ocurre el cruce: `tramo` pantallas,
+    // centradas en el momento en que la foto está en el medio vertical.
+    const desde = vh * (tramo + 1) / 2; // centro acá → p = 0
+    const rango = vh * tramo;           // desde - hasta
     slides.forEach(slide => {
       const r = slide.getBoundingClientRect();
       const centro = r.top + r.height / 2;
-      let p = 1 - centro / vh;
+      let p = (desde - centro) / rango;
       p = Math.max(0, Math.min(1, p));
       colocarCruce(slide, p, anchoCapa);
     });
