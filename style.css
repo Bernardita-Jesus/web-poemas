@@ -430,7 +430,7 @@ body::after {
      object-fit. */
   height: var(--h, calc(var(--col) * 1));
   object-fit: cover;
-  border-radius: 3px;
+  /* puntas rectas, sin redondeo */
   box-shadow: 0 24px 50px -22px rgba(150, 125, 40, .4);
 }
 

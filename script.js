@@ -1106,14 +1106,17 @@ loadSeasonPoem(CURRENT_SEASON);
 // El mosaico y los poemas quedan igual que antes.
 //
 // No es una franja arriba de la web: la capa cubre toda la altura de la
-// página (la misma que el mosaico) y se colocan TEXTURAS_CANTIDAD fotos
-// en posiciones AL AZAR a lo largo de todo el scroll. Cada foto sale con:
+// página (la misma que el mosaico) y las fotos se reparten a lo largo de
+// todo el scroll, parejo de arriba a abajo (sin dejar más de 8 cuadrados
+// del mosaico de hueco entre una y la siguiente, así no quedan zonas
+// peladas, sobre todo el medio de la web). Cada foto sale con:
 //   - una imagen elegida al azar de la lista: se pueden repetir;
-//   - un `top` al azar pero ANCLADO a la grilla del mosaico, de una de
-//     dos maneras (al azar por foto): o el borde de arriba arranca donde
-//     arranca un recorte del mosaico, o arranca a la mitad de la altura
-//     de un recorte. Las fotos PUEDEN encimarse entre ellas, pero nunca
-//     tapándose más del 50% (control por solape vertical);
+//   - un `top` con un poco de jitter alrededor de su lugar del reparto,
+//     pero ANCLADO a la grilla del mosaico, de una de dos maneras (al
+//     azar por foto): o el borde de arriba arranca donde arranca un
+//     recorte del mosaico, o arranca a la mitad de la altura de un
+//     recorte. Las fotos PUEDEN encimarse entre ellas, pero nunca
+//     tapándose más del 60% (control por solape vertical);
 //   - el lado por el que entra al azar (mitad desde cada costado);
 //   - una velocidad de deslizamiento propia: unas cruzan más rápido y
 //     otras más lento, y si dos quedan verticalmente cerca se les fuerza
@@ -1149,7 +1152,9 @@ loadSeasonPoem(CURRENT_SEASON);
 //
 // Ajustes:
 //   TEXTURAS_CANTIDAD     - cuántas fotos se colocan en total (pueden
-//                           repetirse imágenes de la lista).
+//                           repetirse imágenes de la lista). Es un
+//                           mínimo: si hicieran falta más para no dejar
+//                           más de 8 cuadrados de hueco, se agregan.
 //   TEXTURAS_SCROLL_TRAMO - solo modo 'scroll': en cuántas pantallas de
 //                           scroll se completa el cruce de una foto. Más
 //                           alto = la foto se desliza más lento (hay que
@@ -1193,19 +1198,22 @@ function construirTexturas() {
   if (!EFECTO_TEXTURAS || !texturaCapa || TEXTURAS_IMAGE_PATHS.length === 0) return;
   if (texturaCapa.children.length) return; // ya armada: no duplicar
 
-  const cuantas = Math.max(1, TEXTURAS_CANTIDAD);
-
-  // Lado de entrada: mitad desde cada costado, repartidos al azar.
-  const dirs = [];
-  for (let i = 0; i < cuantas; i++) dirs.push(i < cuantas / 2 ? -1 : 1);
-  barajar(dirs);
-
   // Medidas fijas de cada rectángulo, en cuadrados de la grilla:
   //   alto  = 2 cuadrados (recortes del mosaico). Cada recorte mide
   //           --col/2 de alto, así que 2 recortes = --col * 1.
   //   ancho = 5 o 6 cuadrados (columnas), al azar por foto.
   const ALTO_CUADRADOS = 1;          // en unidades de --col (= 2 recortes)
+  const ALTO_FILAS = ALTO_CUADRADOS * 2;  // la textura ocupa 2 filas
   const anchos = [5, 6];
+
+  // Hueco vertical máximo permitido entre una textura y la de al lado:
+  // 8 cuadrados (recortes) = 8 filas del mosaico. Se usa para repartirlas
+  // parejo y que no queden zonas peladas (sobre todo el medio de la web).
+  const MAX_HUECO_FILAS = 8;
+
+  // Tapado máximo: una textura no puede quedar sobre otra tapándola más
+  // del 60% de su alto.
+  const MAX_TAPADO = 0.6;
 
   // Velocidades: cada foto se desliza a su propio ritmo (factor sobre el
   // ritmo base; <1 más lenta, >1 más rápida). Además, si una foto queda
@@ -1231,14 +1239,38 @@ function construirTexturas() {
                 document.documentElement.scrollHeight || 1;
   const filasTotal = Math.max(6, Math.floor(pageH / filaPx));
 
+  // Cuántas texturas: las pedidas en TEXTURAS_CANTIDAD, pero nunca menos
+  // de las que hacen falta para que ninguna quede a más de
+  // MAX_HUECO_FILAS filas de la siguiente.
+  const cuantasMin = 1 + Math.ceil((filasTotal - ALTO_FILAS) /
+                                   (MAX_HUECO_FILAS + ALTO_FILAS));
+  const cuantas = Math.max(1, TEXTURAS_CANTIDAD, cuantasMin);
+
+  // Reparto vertical parejo: la textura i apunta a la fila i * pasoFilas,
+  // desde la 0 (arriba de todo) hasta filasTotal - ALTO_FILAS (abajo de
+  // todo). El jitter que se le permite alrededor es lo que sobra para
+  // llegar justo al límite de hueco, así el reparto no queda rígido pero
+  // tampoco deja zonas peladas.
+  const pasoFilas = cuantas > 1 ? (filasTotal - ALTO_FILAS) / (cuantas - 1) : 0;
+  const jitterFilas = Math.max(0, Math.min(
+    pasoFilas / 2,
+    // "- 1" para absorber el redondeo de k a fila entera en los dos extremos
+    (MAX_HUECO_FILAS + ALTO_FILAS - pasoFilas - 1) / 2,
+    3));
+
+  // Lado de entrada: mitad desde cada costado, repartidos al azar.
+  const dirs = [];
+  for (let i = 0; i < cuantas; i++) dirs.push(i < cuantas / 2 ? -1 : 1);
+  barajar(dirs);
+
   // Control de solape: se guarda el tramo vertical [a, b] en px y la vel
   // de cada textura ya puesta.
   const puestas = [];
-  // ninguna foto tapa a otra más del 50% de la más chica de las dos.
+  // ninguna textura tapa a otra más de MAX_TAPADO del alto de la más chica.
   function solapeOK(a, b) {
     return puestas.every(o => {
       const ov = Math.max(0, Math.min(b, o.b) - Math.max(a, o.a));
-      return ov <= 0.5 * Math.min(b - a, o.b - o.a);
+      return ov <= MAX_TAPADO * Math.min(b - a, o.b - o.a);
     });
   }
   // "vecinas" verticales: se enciman o quedan a menos de medio alto de
@@ -1267,17 +1299,22 @@ function construirTexturas() {
     //             del mosaico  -> k filas  -> top = --col * (k/2)
     //   - 'media': arranca a la mitad de la altura de un recorte
     //             -> k filas + media fila -> top = --col * (k/2 + 0.25)
-    // (una fila = un recorte = --col/2 de alto). Se sortea la fila k y se
-    // reintenta hasta 40 veces si taparía a otra textura más del 50%.
+    // (una fila = un recorte = --col/2 de alto). La fila k arranca en la
+    // fila objetivo del reparto parejo (i * pasoFilas) y se le suma un
+    // jitter chico; después se reintenta si taparía a otra textura más
+    // del 60% (MAX_TAPADO).
     const hPx = ALTO_CUADRADOS * colPx;        // alto de la textura (2 filas)
     const enMedio = Math.random() < 0.5;
-    // la fila de arranque puede ir desde la 0 (pegada arriba) hasta la
-    // última que deja entrar las 2 filas de alto sin pasarse del final
-    // (media fila menos si arranca "en la mitad").
-    const kMax = filasTotal - 2 - (enMedio ? 1 : 0);
+    // la fila de arranque no puede pasar la última que deja entrar las
+    // 2 filas de alto sin cortarse por abajo (media fila menos si arranca
+    // "en la mitad").
+    const kMax = filasTotal - ALTO_FILAS - (enMedio ? 1 : 0);
+    const kIdeal = i * pasoFilas;
     let k, a, b, intento = 0;
     do {
-      k = Math.floor(Math.random() * (kMax + 1));
+      const jit = (Math.random() * 2 - 1) * jitterFilas;
+      k = Math.round(kIdeal + jit);
+      k = Math.max(0, Math.min(kMax, k));
       a = k * filaPx + (enMedio ? filaPx / 2 : 0);
       b = a + hPx;
     } while (!solapeOK(a, b) && ++intento < 40);
