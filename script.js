@@ -1271,10 +1271,13 @@ function construirTexturas() {
     // reintenta hasta 40 veces si taparía a otra textura más del 50%.
     const hPx = ALTO_CUADRADOS * colPx;        // alto de la textura (2 filas)
     const enMedio = Math.random() < 0.5;
+    // la fila de arranque puede ir desde la 0 (pegada arriba) hasta la
+    // última que deja entrar las 2 filas de alto sin pasarse del final
+    // (media fila menos si arranca "en la mitad").
+    const kMax = filasTotal - 2 - (enMedio ? 1 : 0);
     let k, a, b, intento = 0;
     do {
-      // fila de arranque al azar, dejando lugar abajo para las 2 filas de alto
-      k = 2 + Math.floor(Math.random() * Math.max(1, filasTotal - 5));
+      k = Math.floor(Math.random() * (kMax + 1));
       a = k * filaPx + (enMedio ? filaPx / 2 : 0);
       b = a + hPx;
     } while (!solapeOK(a, b) && ++intento < 40);
