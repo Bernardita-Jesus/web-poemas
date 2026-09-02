@@ -76,12 +76,31 @@ const SORT_JITTER = 0.15;
 // (prefers-reduced-motion).
 //
 // Ajustes:
-//   MOSAICO_CAMBIO_PORCENTAJE - qué proporción del mosaico se toca en cada
-//                               ciclo (5 = 5% de los cuadrados)
+//   MOSAICO_CAMBIO_PORCENTAJE - qué proporción del mosaico ARRANCA un
+//                               cambio en cada ciclo (5 = 5% de los
+//                               cuadrados por ciclo)
 //   MOSAICO_CAMBIO_INTERVALO  - cuánto dura ese ciclo, en milisegundos
 //                               (más alto = cambios más espaciados)
 //   MOSAICO_DESLIZ_MS         - cuánto tarda un cuadrado en deslizarse
 //                               hasta el recorte de al lado (modo 'desliz')
+//
+// PORCENTAJE vs. CUADRADOS MOVIÉNDOSE A LA VEZ (modo 'desliz'):
+//   El porcentaje es cuántos EMPIEZAN a deslizarse por ciclo, no cuántos
+//   se ven en movimiento en un instante. Como cada deslizamiento (15 s)
+//   dura más que el ciclo (5 s), se van solapando y acumulando. La
+//   cantidad que hay moviéndose a la vez, en régimen, es:
+//
+//       PORCENTAJE * (MOSAICO_DESLIZ_MS / MOSAICO_CAMBIO_INTERVALO)
+//       = 5% * (15000 / 5000) = 5% * 3 = 15% del mosaico
+//
+//   Sobre ~780 cuadrados son ~115 deslizándose simultáneamente (un poco
+//   menos por los que se saltean si les toca uno que ya está en marcha).
+//   El arranque "en caliente" larga de una esa misma tanda de ~115, así
+//   ese 15% ya está presente desde el primer momento en vez de tardar
+//   15 s en acumularse.
+//
+//   Para que se vean MENOS en movimiento a la vez: bajá PORCENTAJE.
+//   Para que cambien más seguido: bajá INTERVALO.
 // =====================================================================
 const EFECTO_MOSAICO = true;
 const MOSAICO_MODO = 'desliz'; // 'desliz' | 'intercambio'
