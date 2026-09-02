@@ -316,7 +316,13 @@ body {
 .poem .typing::after {
   content: "▍";
   display: inline-block;
-  margin-left: 1px;
+  /* Ancho 0 + overflow visible: el cursor se dibuja pero no ocupa lugar
+     en el renglón. Así, cuando la línea termina de teclearse y se saca la
+     clase .typing, el texto no pega un salto hacia el costado (se notaba
+     sobre todo en los poemas alineados a la derecha). */
+  width: 0;
+  overflow: visible;
+  margin-left: 0;
   color: rgba(255, 255, 255, .9);
   animation: caret-blink 1s steps(1, end) infinite;
 }
