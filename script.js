@@ -1,6 +1,12 @@
 let uploadedImages = [];
 let mosaicCanvas = null;
 
+// efecto escritura: el tecleo de los poemas no arranca hasta que el
+// mosaico de fondo terminó de dibujarse. Hasta entonces, los poemas que
+// ya entraron en pantalla esperan su turno en esta cola.
+let mosaicReady = false;
+const pendingTypewriter = [];
+
 // Recortes ya calculados (color, brillo, imgData) del último mosaico armado,
 // y el layout con el que se dibujaron.
 let currentTiles = [];
@@ -285,6 +291,9 @@ function buildMosaic() {
       processBtn.disabled = false;
       processBtn.textContent = 'Armar mosaico';
       downloadBtn.disabled = false;
+      // efecto escritura: recién con el mosaico dibujado se sueltan los
+      // poemas que estaban esperando para empezar a teclearse.
+      markMosaicReady();
     };
 
     renderCurrentTiles(finish);
@@ -435,6 +444,11 @@ const poemCard = document.getElementById('poemCard');
 // de golpe: se "teclean" letra por letra, uno abajo del otro, con un
 // cursor parpadeante al final de la línea que se está escribiendo.
 //
+// El tecleo no arranca hasta que el mosaico de fondo terminó de
+// dibujarse: los poemas que ya están en pantalla esperan en cola y
+// empiezan todos juntos cuando el mosaico está listo (ver mosaicReady /
+// markMosaicReady).
+//
 // PARA DESACTIVARLO: poné EFECTO_ESCRITURA en false. Los poemas siguen
 // entrando con el fundido de siempre, pero con el texto completo desde
 // el arranque (sin tecleo ni cursor). No hace falta tocar nada más.
@@ -459,12 +473,11 @@ const FIN_ORACION = /[.!?…]$/;   // el verso cierra una oración
 const prefersReducedMotion = !!(window.matchMedia &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
-// efecto escritura: recorre en orden los elementos "tecleables" del poema
-// (título y versos, guardados en article._typeTargets con su texto en
-// dataset.full) y va escribiendo cada uno carácter a carácter. Mientras
-// una línea se teclea lleva la clase .typing, que en style.css le dibuja
-// un cursor parpadeante al final. Con el efecto desactivado (o si el
-// sistema pide menos movimiento) se vuelca el texto completo sin animar.
+// efecto escritura: decide qué hacer con un poema que acaba de entrar en
+// pantalla. Si el efecto está apagado (o el sistema pide menos
+// movimiento), vuelca el texto completo sin animar. Si el mosaico de
+// fondo todavía se está armando, deja el poema en cola. Si ya está todo
+// listo, lo empieza a teclear.
 function startTypewriter(article) {
   const targets = (article && article._typeTargets) || [];
   if (targets.length === 0) return;
@@ -473,6 +486,38 @@ function startTypewriter(article) {
     targets.forEach(el => { el.textContent = el.dataset.full || ''; });
     return;
   }
+
+  if (!mosaicReady) {
+    pendingTypewriter.push(article);
+    return;
+  }
+
+  runTypewriter(article);
+}
+
+// efecto escritura: se llama cuando el mosaico de fondo ya está dibujado.
+// Marca la bandera y suelta el tecleo de todos los poemas que quedaron
+// esperando en la cola.
+function markMosaicReady() {
+  if (mosaicReady) return;
+  mosaicReady = true;
+  pendingTypewriter.splice(0).forEach(runTypewriter);
+}
+
+// Red de seguridad: si el mosaico nunca llega a terminar (por ejemplo,
+// si fallan las imágenes de assets/imagenes), igual arrancamos los
+// poemas después de unos segundos para que la página no quede muda.
+setTimeout(markMosaicReady, 8000);
+
+// efecto escritura: teclea de verdad un poema. Recorre en orden sus
+// elementos "tecleables" (título y versos, guardados en
+// article._typeTargets con su texto en dataset.full) y va escribiendo
+// cada uno carácter a carácter. Mientras una línea se teclea lleva la
+// clase .typing, que en style.css le dibuja un cursor parpadeante al
+// final.
+function runTypewriter(article) {
+  const targets = (article && article._typeTargets) || [];
+  if (targets.length === 0) return;
 
   let ti = 0;
   function typeElement() {
