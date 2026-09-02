@@ -1112,8 +1112,8 @@ loadSeasonPoem(CURRENT_SEASON);
 //   - un `top` al azar: las fotos PUEDEN encimarse entre ellas, pero
 //     nunca tapándose más del 50% (control por solape vertical);
 //   - el lado por el que entra al azar (mitad desde cada costado);
-//   - un ancho al azar, como mucho 6 columnas de la grilla, y un alto al
-//     azar, como mucho 3 recortes del mosaico (ver style.css).
+//   - un ancho al azar entre 5 y 6 cuadrados de la grilla, y un alto al
+//     azar entre 2 y 3 cuadrados del mosaico (ver style.css).
 //
 // En los dos modos cada foto hace el mismo recorrido: CRUZA la pantalla
 // de lado a lado. Entra por un extremo, la atraviesa entera y desaparece
@@ -1194,9 +1194,10 @@ function construirTexturas() {
   for (let i = 0; i < cuantas; i++) dirs.push(i < cuantas / 2 ? -1 : 1);
   barajar(dirs);
 
-  // Anchos posibles, en columnas de la grilla: 4, 5 o 6 (tope 6).
-  const anchos = [4, 5, 6];
-  // Altos posibles, en recortes del mosaico: 2, 2,5 o 3 (tope 3).
+  // Anchos posibles, en cuadrados (columnas) de la grilla: 5, 5,5 o 6.
+  const anchos = [5, 5.5, 6];
+  // Altos posibles, en cuadrados (recortes) del mosaico: 2, 2,5 o 3.
+  // Cada recorte mide --col/2 de alto, así que van en unidades de --col.
   const altos = [1, 1.25, 1.5];
 
   // Control de solape: trabajamos en px sobre el alto real de la capa
