@@ -1106,11 +1106,14 @@ loadSeasonPoem(CURRENT_SEASON);
 // El mosaico y los poemas quedan igual que antes.
 //
 // No es una franja arriba de la web: la capa cubre toda la altura de la
-// página (la misma que el mosaico) y las fotos se ubican en posiciones
-// AL AZAR a lo largo de todo el scroll. Cada foto sale con:
-//   - un `top` al azar (repartido para que no se encimen);
+// página (la misma que el mosaico) y se colocan TEXTURAS_CANTIDAD fotos
+// en posiciones AL AZAR a lo largo de todo el scroll. Cada foto sale con:
+//   - una imagen elegida al azar de la lista: se pueden repetir;
+//   - un `top` al azar: las fotos PUEDEN encimarse entre ellas, pero
+//     nunca tapándose más del 50% (control por solape vertical);
 //   - el lado por el que entra al azar (mitad desde cada costado);
-//   - un alto al azar, como mucho 3 recortes del mosaico (ver style.css).
+//   - un ancho al azar, como mucho 6 columnas de la grilla, y un alto al
+//     azar, como mucho 3 recortes del mosaico (ver style.css).
 //
 // En los dos modos cada foto hace el mismo recorrido: CRUZA la pantalla
 // de lado a lado. Entra por un extremo, la atraviesa entera y desaparece
@@ -1134,11 +1137,13 @@ loadSeasonPoem(CURRENT_SEASON);
 // no pasa nada más.
 //
 // PARA CAMBIAR LAS FOTOS: poné los archivos en assets/imagenes/ y editá
-// TEXTURAS_IMAGE_PATHS, en el orden en que querés que aparezcan. Con la
-// lista vacía, la capa queda oculta (ver .textura-capa:empty en
-// style.css).
+// TEXTURAS_IMAGE_PATHS. Como las fotos se eligen al azar y se pueden
+// repetir, el orden de la lista no importa. Con la lista vacía, la capa
+// queda oculta (ver .textura-capa:empty en style.css).
 //
 // Ajustes:
+//   TEXTURAS_CANTIDAD     - cuántas fotos se colocan en total (pueden
+//                           repetirse imágenes de la lista).
 //   TEXTURAS_SCROLL_TRAMO - solo modo 'scroll': en cuántas pantallas de
 //                           scroll se completa el cruce de una foto. Más
 //                           alto = la foto se desliza más lento (hay que
@@ -1153,6 +1158,7 @@ loadSeasonPoem(CURRENT_SEASON);
 // =====================================================================
 const EFECTO_TEXTURAS = true;
 const TEXTURAS_MODO = 'scroll'; // 'scroll' | 'constante'
+const TEXTURAS_CANTIDAD = 10;
 const TEXTURAS_SCROLL_TRAMO = 4;
 const TEXTURAS_IMAGE_PATHS = [
   'assets/imagenes/textura-otono-01.jpeg',
@@ -1180,37 +1186,67 @@ function barajar(a) {
 function construirTexturas() {
   if (!EFECTO_TEXTURAS || !texturaCapa || TEXTURAS_IMAGE_PATHS.length === 0) return;
   if (texturaCapa.children.length) return; // ya armada: no duplicar
-  const total = TEXTURAS_IMAGE_PATHS.length;
+
+  const cuantas = Math.max(1, TEXTURAS_CANTIDAD);
 
   // Lado de entrada: mitad desde cada costado, repartidos al azar.
-  const dirs = TEXTURAS_IMAGE_PATHS.map((_, i) => (i < total / 2 ? -1 : 1));
+  const dirs = [];
+  for (let i = 0; i < cuantas; i++) dirs.push(i < cuantas / 2 ? -1 : 1);
   barajar(dirs);
+
+  // Anchos posibles, en columnas de la grilla: 4, 5 o 6 (tope 6).
+  const anchos = [4, 5, 6];
   // Altos posibles, en recortes del mosaico: 2, 2,5 o 3 (tope 3).
   const altos = [1, 1.25, 1.5];
 
-  TEXTURAS_IMAGE_PATHS.forEach((path, i) => {
+  // Control de solape: trabajamos en px sobre el alto real de la capa
+  // (que ya es el de la página: el mosaico terminó de dibujarse). Se
+  // guarda el tramo vertical [a, b] de cada foto ya puesta y se exige que
+  // ninguna tape a otra más del 50% de la más chica de las dos.
+  const colPx = (window.innerWidth || document.documentElement.clientWidth) / 13;
+  const pageH = texturaCapa.offsetHeight || document.documentElement.scrollHeight || 1;
+  const puestas = [];
+  function solapeOK(a, b) {
+    return puestas.every(o => {
+      const ov = Math.max(0, Math.min(b, o.b) - Math.max(a, o.a));
+      return ov <= 0.5 * Math.min(b - a, o.b - o.a);
+    });
+  }
+
+  for (let i = 0; i < cuantas; i++) {
     const fig = document.createElement('figure');
     fig.className = 'textura-slide';
     fig.dataset.dir = String(dirs[i]);
     // modo 'constante': desfasaje al azar para que no crucen sincronizadas.
     fig.dataset.fase = Math.random().toFixed(4);
-    // Ubicación vertical al azar: la página se parte en `total` franjas y
-    // cada foto cae en un punto cualquiera de su franja (10%–70% de la
-    // franja), así quedan repartidas sin patrón y sin encimarse. El total
-    // se comprime al 92% para que la última no quede pegada al borde de
-    // abajo (donde overflow: hidden la recortaría).
-    const top = (i + 0.1 + Math.random() * 0.6) / total * 92;
-    fig.style.top = top.toFixed(2) + '%';
-    // Alto al azar (como mucho 3 recortes del mosaico); ver style.css.
-    const k = altos[Math.floor(Math.random() * altos.length)];
-    fig.style.setProperty('--h', 'calc(var(--col) * ' + k + ')');
+
+    // ancho y alto al azar (topes 6 columnas / 3 recortes); ver style.css.
+    const w = anchos[Math.floor(Math.random() * anchos.length)];
+    const h = altos[Math.floor(Math.random() * altos.length)];
+    fig.style.setProperty('--w', 'calc(var(--col) * ' + w + ')');
+    fig.style.setProperty('--h', 'calc(var(--col) * ' + h + ')');
+
+    // top al azar en [1%, 91%]; se reintenta hasta 40 veces si taparía a
+    // otra foto más del 50%. Si no encuentra hueco, se queda con el
+    // último intento (peor caso, poco frecuente).
+    const hPx = h * colPx;
+    let topPct, a, b, intento = 0;
+    do {
+      topPct = 1 + Math.random() * 90;
+      a = topPct / 100 * pageH;
+      b = a + hPx;
+    } while (!solapeOK(a, b) && ++intento < 40);
+    puestas.push({ a, b });
+    fig.style.top = topPct.toFixed(2) + '%';
+
     const img = new Image();
-    img.src = path;
+    // imagen al azar de la lista: se puede repetir.
+    img.src = TEXTURAS_IMAGE_PATHS[Math.floor(Math.random() * TEXTURAS_IMAGE_PATHS.length)];
     img.alt = '';
     img.loading = 'lazy';
     fig.appendChild(img);
     texturaCapa.appendChild(fig);
-  });
+  }
   if (TEXTURAS_MODO === 'scroll') iniciarDeslizScroll();
   else iniciarDeslizConstante();
   // fundido de entrada: ya colocadas las fotos, mostramos la capa (ver

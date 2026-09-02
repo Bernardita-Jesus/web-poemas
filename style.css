@@ -409,8 +409,10 @@ body::after {
   position: absolute;
   left: 0;
   margin: 0;
-  /* 7 columnas de la grilla del mosaico de ancho */
-  width: calc(var(--col) * 7);
+  /* ancho: al azar por foto, como mucho 6 columnas de la grilla del
+     mosaico (--col * 6). script.js baja ese valor con --w (4 o 5
+     columnas) en algunas fotos. */
+  width: var(--w, calc(var(--col) * 6));
   will-change: transform;
   /* Para que se lean más como textura y menos como foto suelta se puede
      descomentar esto (multiplica los colores contra el mosaico): */
@@ -424,8 +426,8 @@ body::after {
      Cada recorte mide tileH 60 en el canvas = --col/2 en pantalla
      (tileW 120 : tileH 60; ver index.html), así que 3 recortes =
      --col * 1.5. script.js baja ese valor con --h (2 o 2,5 recortes) en
-     algunas fotos. El ancho (7 columnas) manda: la foto se recorta a
-     esta caja con object-fit. */
+     algunas fotos. El ancho de la caja manda: la foto se recorta a ella
+     con object-fit. */
   height: var(--h, calc(var(--col) * 1.5));
   object-fit: cover;
   border-radius: 3px;
