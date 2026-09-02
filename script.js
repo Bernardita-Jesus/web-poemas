@@ -1109,10 +1109,11 @@ loadSeasonPoem(CURRENT_SEASON);
 // página (la misma que el mosaico) y se colocan TEXTURAS_CANTIDAD fotos
 // en posiciones AL AZAR a lo largo de todo el scroll. Cada foto sale con:
 //   - una imagen elegida al azar de la lista: se pueden repetir;
-//   - un `top` al azar pero ANCLADO a la grilla del mosaico: el borde de
-//     arriba cae en una línea de fila, o en el medio de una fila ("en la
-//     mitad de un mosaico"). Las fotos PUEDEN encimarse entre ellas, pero
-//     nunca tapándose más del 50% (control por solape vertical);
+//   - un `top` al azar pero ANCLADO a la grilla del mosaico, de una de
+//     dos maneras (al azar por foto): o el borde de arriba arranca donde
+//     arranca un recorte del mosaico, o arranca a la mitad de la altura
+//     de un recorte. Las fotos PUEDEN encimarse entre ellas, pero nunca
+//     tapándose más del 50% (control por solape vertical);
 //   - el lado por el que entra al azar (mitad desde cada costado);
 //   - una velocidad de deslizamiento propia: unas cruzan más rápido y
 //     otras más lento, y si dos quedan verticalmente cerca se les fuerza
@@ -1213,11 +1214,25 @@ function construirTexturas() {
   const VEL_MIN = 0.55, VEL_SPAN = 1.2;   // vel en [0.55, 1.75]
   const VEL_DIF_MIN = 0.45;               // separación mínima con una vecina
 
-  // Control de solape: trabajamos en px sobre el alto real de la capa
-  // (que ya es el de la página: el mosaico terminó de dibujarse). Se
-  // guarda el tramo vertical [a, b] y la vel de cada foto ya puesta.
-  const colPx = (window.innerWidth || document.documentElement.clientWidth) / 13;
-  const pageH = texturaCapa.offsetHeight || document.documentElement.scrollHeight || 1;
+  // Grilla del mosaico en pantalla: 13 columnas que ocupan todo el ancho
+  // visible, y filas (recortes) de media columna de alto (tileW 120 :
+  // tileH 60). Medimos la columna real contra el ANCHO DEL CANVAS (sin
+  // barra de scroll) y fijamos ese valor como --col en la capa, así todo
+  // lo que se dibuja con calc(var(--col) ...) —ancho, alto y top de cada
+  // textura— cae exacto sobre la grilla. El alto real del canvas dice
+  // cuántas filas entran.
+  const anchoVisible = document.documentElement.clientWidth || window.innerWidth;
+  const colPx = anchoVisible / 13;
+  const filaPx = colPx / 2;
+  texturaCapa.style.setProperty('--col', colPx + 'px');
+  const canvasEl = document.querySelector('#canvas-holder canvas');
+  const pageH = (canvasEl && canvasEl.getBoundingClientRect().height) ||
+                texturaCapa.offsetHeight ||
+                document.documentElement.scrollHeight || 1;
+  const filasTotal = Math.max(6, Math.floor(pageH / filaPx));
+
+  // Control de solape: se guarda el tramo vertical [a, b] en px y la vel
+  // de cada textura ya puesta.
   const puestas = [];
   // ninguna foto tapa a otra más del 50% de la más chica de las dos.
   function solapeOK(a, b) {
@@ -1247,25 +1262,26 @@ function construirTexturas() {
     fig.style.setProperty('--w', 'calc(var(--col) * ' + w + ')');
     fig.style.setProperty('--h', 'calc(var(--col) * ' + ALTO_CUADRADOS + ')');
 
-    // top: al azar, pero ANCLADO a la grilla del mosaico. Las filas del
-    // mosaico miden --col/2 (tileH 60), así que el borde de arriba de la
-    // textura cae justo en una línea de fila; en la mitad de las texturas
-    // se corre --col/4 para que quede centrada en una fila ("en la mitad
-    // de un mosaico"). Se reintenta hasta 40 veces si taparía a otra
-    // textura más del 50%.
-    const hPx = ALTO_CUADRADOS * colPx;
-    const filaPx = colPx / 2;                 // alto de una fila del mosaico
-    const enMedio = Math.random() < 0.5;      // centrada en una fila, no en la línea
-    let topPx, a, b, intento = 0;
+    // top ANCLADO a la grilla del mosaico, de una de dos maneras (al azar):
+    //   - 'linea': el borde de arriba arranca donde arranca un recorte
+    //             del mosaico  -> k filas  -> top = --col * (k/2)
+    //   - 'media': arranca a la mitad de la altura de un recorte
+    //             -> k filas + media fila -> top = --col * (k/2 + 0.25)
+    // (una fila = un recorte = --col/2 de alto). Se sortea la fila k y se
+    // reintenta hasta 40 veces si taparía a otra textura más del 50%.
+    const hPx = ALTO_CUADRADOS * colPx;        // alto de la textura (2 filas)
+    const enMedio = Math.random() < 0.5;
+    let k, a, b, intento = 0;
     do {
-      const crudo = (1 + Math.random() * 90) / 100 * pageH;
-      topPx = Math.round(crudo / filaPx) * filaPx + (enMedio ? filaPx / 2 : 0);
-      a = topPx;
+      // fila de arranque al azar, dejando lugar abajo para las 2 filas de alto
+      k = 2 + Math.floor(Math.random() * Math.max(1, filasTotal - 5));
+      a = k * filaPx + (enMedio ? filaPx / 2 : 0);
       b = a + hPx;
     } while (!solapeOK(a, b) && ++intento < 40);
-    // se guarda en % para que siga anclada al reescalar la ventana (la
-    // grilla y la página escalan las dos con el ancho del viewport).
-    fig.style.top = (topPx / pageH * 100).toFixed(3) + '%';
+    // top exacto sobre la grilla, en unidades de --col (aguanta el
+    // reescalado: la grilla y este calc() escalan los dos con --col).
+    const uCol = k / 2 + (enMedio ? 0.25 : 0);
+    fig.style.top = 'calc(var(--col) * ' + uCol + ')';
 
     // velocidad: al azar, pero separada de la de sus vecinas verticales.
     const cerca = vecinas(a, b);

@@ -393,10 +393,12 @@ body::after {
      no se ve ningún reacomodo de las fotos al cargar. */
   opacity: 0;
   transition: opacity .5s ease;
-  /* Ancho en pantalla de UNA columna del mosaico: el canvas ocupa 100vw
-     repartido en 13 columnas (TARGET_WIDTH 1600 / tileW 120, redondeado;
-     ver script.js y .poem-card). Las fotos se miden como múltiplos de
-     esta columna para que peguen con la grilla del mosaico. */
+  /* Ancho en pantalla de UNA columna del mosaico: el canvas se reparte
+     en 13 columnas (TARGET_WIDTH 1600 / tileW 120, redondeado; ver
+     script.js y .poem-card). Ancho, alto y top de cada textura se miden
+     como múltiplos de --col para pegar con la grilla. Este valor es un
+     respaldo: al armar la capa, script.js lo pisa con la medida exacta
+     en px (ancho del canvas / 13, sin barra de scroll). */
   --col: calc(100vw / 13);
 }
 .textura-capa:empty { display: none; }
