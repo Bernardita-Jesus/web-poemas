@@ -1109,7 +1109,9 @@ loadSeasonPoem(CURRENT_SEASON);
 // página (la misma que el mosaico) y se colocan TEXTURAS_CANTIDAD fotos
 // en posiciones AL AZAR a lo largo de todo el scroll. Cada foto sale con:
 //   - una imagen elegida al azar de la lista: se pueden repetir;
-//   - un `top` al azar: las fotos PUEDEN encimarse entre ellas, pero
+//   - un `top` al azar pero ANCLADO a la grilla del mosaico: el borde de
+//     arriba cae en una línea de fila, o en el medio de una fila ("en la
+//     mitad de un mosaico"). Las fotos PUEDEN encimarse entre ellas, pero
 //     nunca tapándose más del 50% (control por solape vertical);
 //   - el lado por el que entra al azar (mitad desde cada costado);
 //   - una velocidad de deslizamiento propia: unas cruzan más rápido y
@@ -1245,17 +1247,25 @@ function construirTexturas() {
     fig.style.setProperty('--w', 'calc(var(--col) * ' + w + ')');
     fig.style.setProperty('--h', 'calc(var(--col) * ' + ALTO_CUADRADOS + ')');
 
-    // top al azar en [1%, 91%]; se reintenta hasta 40 veces si taparía a
-    // otra foto más del 50%. Si no encuentra hueco, se queda con el
-    // último intento (peor caso, poco frecuente).
+    // top: al azar, pero ANCLADO a la grilla del mosaico. Las filas del
+    // mosaico miden --col/2 (tileH 60), así que el borde de arriba de la
+    // textura cae justo en una línea de fila; en la mitad de las texturas
+    // se corre --col/4 para que quede centrada en una fila ("en la mitad
+    // de un mosaico"). Se reintenta hasta 40 veces si taparía a otra
+    // textura más del 50%.
     const hPx = ALTO_CUADRADOS * colPx;
-    let topPct, a, b, intento = 0;
+    const filaPx = colPx / 2;                 // alto de una fila del mosaico
+    const enMedio = Math.random() < 0.5;      // centrada en una fila, no en la línea
+    let topPx, a, b, intento = 0;
     do {
-      topPct = 1 + Math.random() * 90;
-      a = topPct / 100 * pageH;
+      const crudo = (1 + Math.random() * 90) / 100 * pageH;
+      topPx = Math.round(crudo / filaPx) * filaPx + (enMedio ? filaPx / 2 : 0);
+      a = topPx;
       b = a + hPx;
     } while (!solapeOK(a, b) && ++intento < 40);
-    fig.style.top = topPct.toFixed(2) + '%';
+    // se guarda en % para que siga anclada al reescalar la ventana (la
+    // grilla y la página escalan las dos con el ancho del viewport).
+    fig.style.top = (topPx / pageH * 100).toFixed(3) + '%';
 
     // velocidad: al azar, pero separada de la de sus vecinas verticales.
     const cerca = vecinas(a, b);
