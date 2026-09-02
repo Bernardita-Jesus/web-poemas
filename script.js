@@ -1103,22 +1103,24 @@ loadSeasonPoem(CURRENT_SEASON);
 // página (la misma que el mosaico) y las fotos aparecen repartidas de
 // arriba a abajo, encima del mosaico.
 //
-// Hay dos modos, se elige con TEXTURAS_MODO:
+// En los dos modos cada foto hace el mismo recorrido: CRUZA la pantalla
+// de lado a lado. Entra por un extremo, la atraviesa entera y desaparece
+// por el otro (la capa recorta lo que se sale con overflow: hidden). Las
+// impares cruzan hacia la izquierda (entran por la derecha) y las pares
+// hacia la derecha. Lo que cambia entre modos es QUÉ mueve ese cruce, y
+// se elige con TEXTURAS_MODO:
 //
-//   'constante' (actual) - cada foto CRUZA la pantalla de lado a lado SIN
-//                PARAR, tipo marquesina. Entra por un extremo, la
-//                atraviesa entera y desaparece por el otro (la capa
-//                recorta lo que se sale); al salir, vuelve a entrar por
-//                donde empezó. No depende del scroll: aunque la página
-//                esté quieta, las fotos siguen cruzando. Las impares
-//                cruzan hacia la izquierda (entran por la derecha) y las
-//                pares hacia la derecha, y cada una va desfasada de las
-//                demás para que no crucen todas juntas.
+//   'scroll' (actual) - cada foto se queda quieta en su lugar y solo
+//                avanza en su cruce cuando scrolleás. Su posición
+//                horizontal está atada a qué tan arriba del viewport va:
+//                centro abajo de la pantalla = recién asomando por un
+//                costado; centro arriba = terminó de cruzar y desapareció
+//                por el otro. Página quieta = fotos quietas.
 //
-//   'scroll'             - la posición horizontal de cada foto sigue al
-//                scroll: entra corrida hacia su lado y se va acomodando
-//                hacia el centro a medida que sube por la pantalla.
-//                Quieta la página, las fotos quedan quietas.
+//   'constante'       - el cruce lo maneja un reloj, no el scroll: las
+//                fotos cruzan solas, sin parar y en bucle (marquesina),
+//                aunque la página esté quieta. Cada una va desfasada de
+//                las demás para que no crucen todas juntas.
 //
 // PARA DESACTIVARLO: poné EFECTO_TEXTURAS en false. La capa no se arma y
 // no pasa nada más.
@@ -1129,18 +1131,15 @@ loadSeasonPoem(CURRENT_SEASON);
 // style.css).
 //
 // Ajustes:
-//   TEXTURAS_CICLO_MS   - modo 'constante': cuánto tarda una foto en
-//                         cruzar toda la pantalla una vez (ms). Más alto
-//                         = cruce más lento.
-//   TEXTURAS_DESLIZ_MAX - modo 'scroll': cuántos px se corre cada foto
-//                         hacia su lado al entrar. Más alto = corrimiento
-//                         más marcado.
+//   TEXTURAS_CICLO_MS - solo modo 'constante': cuánto tarda una foto en
+//                       cruzar toda la pantalla una vez (ms). Más alto =
+//                       cruce más lento.
 //
 // Se apaga solo si el sistema pide menos movimiento
 // (prefers-reduced-motion): las fotos quedan quietas en su lugar.
 // =====================================================================
 const EFECTO_TEXTURAS = true;
-const TEXTURAS_MODO = 'constante'; // 'constante' | 'scroll'
+const TEXTURAS_MODO = 'scroll'; // 'scroll' | 'constante'
 const TEXTURAS_IMAGE_PATHS = [
   'assets/imagenes/textura-otono-01.jpeg',
   'assets/imagenes/textura-otono-02.jpeg',
@@ -1151,8 +1150,7 @@ const TEXTURAS_IMAGE_PATHS = [
   'assets/imagenes/textura-otono-07.jpg',
   'assets/imagenes/textura-otono-08.jpg',
 ];
-const TEXTURAS_DESLIZ_MAX = 120;
-const TEXTURAS_CICLO_MS = 16000;
+const TEXTURAS_CICLO_MS = 24000;
 
 const texturaCapa = document.getElementById('texturaCapa');
 
@@ -1179,13 +1177,27 @@ function construirTexturas() {
   else iniciarDeslizConstante();
 }
 
-// efecto texturas, modo 'constante': un único bucle de animación cruza
-// todas las fotos de lado a lado, sin parar y en bucle (marquesina).
-// `dir` marca hacia qué lado cruza cada una (+1 hacia la derecha, -1
-// hacia la izquierda); `fase` la desincroniza del resto. El recorrido va
-// de "fuera por un lado" a "fuera por el otro": ancho de la capa + ancho
-// de la foto, así entra y sale del todo. Lo que se sale lo recorta
-// .textura-capa (overflow: hidden).
+// efecto texturas: coloca una foto en el punto `p` (0..1) de su cruce de
+// lado a lado. p = 0 → fuera de la pantalla por un costado; p = 1 → fuera
+// por el opuesto; p = 0,5 → centrada. Hacia qué lado cruza lo decide
+// `dir` (+1 hacia la derecha, -1 hacia la izquierda). El recorrido es el
+// ancho de la capa + el ancho de la foto, así entra y sale del todo. Es
+// el paso común a los dos modos: lo que cambia es de dónde sale `p`.
+function colocarCruce(slide, p, anchoCapa) {
+  const dir = parseFloat(slide.dataset.dir) || -1;
+  const w = slide.offsetWidth;
+  const baseLeft = slide.offsetLeft; // posición natural dentro de la capa
+  const recorrido = anchoCapa + w;
+  // borde izquierdo buscado: de -w (fuera por la izquierda) a anchoCapa
+  // (fuera por la derecha), o al revés.
+  const objetivoLeft = dir > 0 ? -w + p * recorrido
+                               : anchoCapa - p * recorrido;
+  slide.style.transform = 'translateX(' + (objetivoLeft - baseLeft).toFixed(1) + 'px)';
+}
+
+// efecto texturas, modo 'constante': un único bucle de animación lleva el
+// `p` de cada foto de 0 a 1 sin parar y en bucle (marquesina). `fase` la
+// desincroniza del resto.
 function iniciarDeslizConstante() {
   const slides = Array.from(texturaCapa.querySelectorAll('.textura-slide'));
   if (slides.length === 0) return;
@@ -1200,30 +1212,21 @@ function iniciarDeslizConstante() {
     const anchoCapa = texturaCapa.clientWidth || window.innerWidth;
     const t = (ahora - inicio) / TEXTURAS_CICLO_MS;
     slides.forEach(slide => {
-      const dir = parseFloat(slide.dataset.dir) || -1;
       const fase = parseFloat(slide.dataset.fase) || 0;
-      const w = slide.offsetWidth;
-      const baseLeft = slide.offsetLeft; // posición natural dentro de la capa
-      const recorrido = anchoCapa + w;
-      // p avanza 0→1 sin parar y vuelve a empezar.
       let p = (t + fase) % 1;
       if (p < 0) p += 1;
-      // dónde debe quedar el borde izquierdo de la foto: de -w (fuera por
-      // la izquierda) a anchoCapa (fuera por la derecha), o al revés.
-      const objetivoLeft = dir > 0 ? -w + p * recorrido
-                                   : anchoCapa - p * recorrido;
-      slide.style.transform = 'translateX(' + (objetivoLeft - baseLeft).toFixed(1) + 'px)';
+      colocarCruce(slide, p, anchoCapa);
     });
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 }
 
-// efecto texturas, modo 'scroll': engancha el deslizamiento lateral al
-// scroll. En cada frame recalcula, por foto, qué tan arriba de la
-// pantalla va su centro y lo traduce en un desplazamiento horizontal que
-// arranca en TEXTURAS_DESLIZ_MAX (foto recién asomada por abajo) y baja a
-// 0 (foto saliendo por arriba).
+// efecto texturas, modo 'scroll': el `p` de cada foto sale de qué tan
+// arriba del viewport va su centro. Centro en el borde de abajo → p = 0
+// (recién asomando por un costado); centro en el borde de arriba → p = 1
+// (terminó de cruzar). Entre medio, la foto avanza su cruce a medida que
+// scrolleás; con el scroll parado no se mueve.
 function iniciarDeslizScroll() {
   const slides = Array.from(texturaCapa.querySelectorAll('.textura-slide'));
   if (slides.length === 0) return;
@@ -1237,17 +1240,13 @@ function iniciarDeslizScroll() {
   function actualizar() {
     ticking = false;
     const vh = window.innerHeight || document.documentElement.clientHeight;
+    const anchoCapa = texturaCapa.clientWidth || window.innerWidth;
     slides.forEach(slide => {
       const r = slide.getBoundingClientRect();
       const centro = r.top + r.height / 2;
-      // p = 0 cuando el centro de la foto está en el borde inferior del
-      // viewport; p = 1 cuando llega al borde superior. Fuera de ese
-      // tramo se recorta a [0, 1].
       let p = 1 - centro / vh;
       p = Math.max(0, Math.min(1, p));
-      const dir = parseFloat(slide.dataset.dir) || -1;
-      const dx = dir * TEXTURAS_DESLIZ_MAX * (1 - p);
-      slide.style.transform = 'translateX(' + dx.toFixed(1) + 'px)';
+      colocarCruce(slide, p, anchoCapa);
     });
   }
   function alScroll() {
