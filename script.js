@@ -1107,7 +1107,7 @@ loadSeasonPoem(CURRENT_SEASON);
 //
 // No es una franja arriba de la web: la capa cubre toda la altura de la
 // página (la misma que el mosaico) y las fotos se reparten a lo largo de
-// todo el scroll, parejo de arriba a abajo (sin dejar más de 8 cuadrados
+// todo el scroll, parejo de arriba a abajo (sin dejar más de 9 cuadrados
 // del mosaico de hueco entre una y la siguiente, así no quedan zonas
 // peladas, sobre todo el medio de la web). Cada foto sale con:
 //   - una imagen elegida al azar de la lista: se pueden repetir;
@@ -1154,7 +1154,7 @@ loadSeasonPoem(CURRENT_SEASON);
 //   TEXTURAS_CANTIDAD     - cuántas fotos se colocan en total (pueden
 //                           repetirse imágenes de la lista). Es un
 //                           mínimo: si hicieran falta más para no dejar
-//                           más de 8 cuadrados de hueco, se agregan.
+//                           más de 9 cuadrados de hueco, se agregan.
 //   TEXTURAS_SCROLL_TRAMO - solo modo 'scroll': en cuántas pantallas de
 //                           scroll se completa el cruce de una foto. Más
 //                           alto = la foto se desliza más lento (hay que
@@ -1169,7 +1169,7 @@ loadSeasonPoem(CURRENT_SEASON);
 // =====================================================================
 const EFECTO_TEXTURAS = true;
 const TEXTURAS_MODO = 'scroll'; // 'scroll' | 'constante'
-const TEXTURAS_CANTIDAD = 10;
+const TEXTURAS_CANTIDAD = 12;
 const TEXTURAS_SCROLL_TRAMO = 4;
 const TEXTURAS_IMAGE_PATHS = [
   'assets/imagenes/textura-otono-01.jpeg',
@@ -1207,9 +1207,9 @@ function construirTexturas() {
   const anchos = [5, 6];
 
   // Hueco vertical máximo permitido entre una textura y la de al lado:
-  // 8 cuadrados (recortes) = 8 filas del mosaico. Se usa para repartirlas
+  // 9 cuadrados (recortes) = 9 filas del mosaico. Se usa para repartirlas
   // parejo y que no queden zonas peladas (sobre todo el medio de la web).
-  const MAX_HUECO_FILAS = 8;
+  const MAX_HUECO_FILAS = 9;
 
   // Tapado máximo: una textura no puede quedar sobre otra tapándola más
   // del 60% de su alto.
