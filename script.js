@@ -1112,6 +1112,8 @@ loadSeasonPoem(CURRENT_SEASON);
 //   - un `top` al azar: las fotos PUEDEN encimarse entre ellas, pero
 //     nunca tapándose más del 50% (control por solape vertical);
 //   - el lado por el que entra al azar (mitad desde cada costado);
+//   - una velocidad de deslizamiento propia (cada foto cruza a un ritmo
+//     distinto, unas más lentas y otras más rápidas);
 //   - un ancho al azar entre 5 y 6 cuadrados de la grilla, y un alto al
 //     azar entre 2 y 3 cuadrados del mosaico (ver style.css).
 //
@@ -1220,6 +1222,10 @@ function construirTexturas() {
     fig.dataset.dir = String(dirs[i]);
     // modo 'constante': desfasaje al azar para que no crucen sincronizadas.
     fig.dataset.fase = Math.random().toFixed(4);
+    // velocidad propia: factor al azar para que cada foto se deslice a un
+    // ritmo distinto (1 = ritmo base; <1 más lenta, >1 más rápida). Lo
+    // usan los dos modos.
+    fig.dataset.vel = (0.6 + Math.random() * 1).toFixed(3);
 
     // ancho y alto al azar (topes 6 columnas / 3 recortes); ver style.css.
     const w = anchos[Math.floor(Math.random() * anchos.length)];
@@ -1275,7 +1281,8 @@ function colocarCruce(slide, p, anchoCapa) {
 
 // efecto texturas, modo 'constante': un único bucle de animación lleva el
 // `p` de cada foto de 0 a 1 sin parar y en bucle (marquesina). `fase` la
-// desincroniza del resto.
+// desincroniza del resto y `vel` le da su propio ritmo (divide la
+// duración del ciclo: vel > 1 = ciclo más corto = cruza más rápido).
 function iniciarDeslizConstante() {
   const slides = Array.from(texturaCapa.querySelectorAll('.textura-slide'));
   if (slides.length === 0) return;
@@ -1288,9 +1295,11 @@ function iniciarDeslizConstante() {
   const inicio = performance.now();
   function frame(ahora) {
     const anchoCapa = texturaCapa.clientWidth || window.innerWidth;
-    const t = (ahora - inicio) / TEXTURAS_CICLO_MS;
+    const transcurrido = ahora - inicio;
     slides.forEach(slide => {
       const fase = parseFloat(slide.dataset.fase) || 0;
+      const vel = parseFloat(slide.dataset.vel) || 1;
+      const t = transcurrido / (TEXTURAS_CICLO_MS / vel);
       let p = (t + fase) % 1;
       if (p < 0) p += 1;
       colocarCruce(slide, p, anchoCapa);
@@ -1301,12 +1310,13 @@ function iniciarDeslizConstante() {
 }
 
 // efecto texturas, modo 'scroll': el `p` de cada foto sale de qué tan
-// arriba del viewport va su centro, repartido en TEXTURAS_SCROLL_TRAMO
-// pantallas de scroll. El cruce arranca cuando la foto todavía está
-// media pantalla por debajo del borde inferior (p = 0) y termina cuando
-// ya pasó media pantalla del borde superior (p = 1); cuanto más grande
-// el tramo, más scroll hace falta para cruzar y más lento se desliza.
-// Con el scroll parado no se mueve.
+// arriba del viewport va su centro, repartido en un tramo de pantallas
+// de scroll. El tramo base es TEXTURAS_SCROLL_TRAMO, pero cada foto lo
+// divide por su `vel` para deslizarse a su propio ritmo (vel > 1 = tramo
+// más corto = cruza con menos scroll = más rápido). El cruce arranca con
+// la foto media pantalla por debajo del borde inferior (p = 0) y termina
+// media pantalla por encima del superior (p = 1). Con el scroll parado
+// no se mueve.
 function iniciarDeslizScroll() {
   const slides = Array.from(texturaCapa.querySelectorAll('.textura-slide'));
   if (slides.length === 0) return;
@@ -1316,17 +1326,19 @@ function iniciarDeslizScroll() {
     return;
   }
 
-  const tramo = Math.max(1, TEXTURAS_SCROLL_TRAMO);
+  const tramoBase = Math.max(1, TEXTURAS_SCROLL_TRAMO);
   let ticking = false;
   function actualizar() {
     ticking = false;
     const vh = window.innerHeight || document.documentElement.clientHeight;
     const anchoCapa = texturaCapa.clientWidth || window.innerWidth;
-    // ventana de scroll (en px) donde ocurre el cruce: `tramo` pantallas,
-    // centradas en el momento en que la foto está en el medio vertical.
-    const desde = vh * (tramo + 1) / 2; // centro acá → p = 0
-    const rango = vh * tramo;           // desde - hasta
     slides.forEach(slide => {
+      const vel = parseFloat(slide.dataset.vel) || 1;
+      const tramo = Math.max(1, tramoBase / vel);
+      // ventana de scroll (en px) donde ocurre el cruce de ESTA foto:
+      // `tramo` pantallas, centradas en cuando está en el medio vertical.
+      const desde = vh * (tramo + 1) / 2; // centro acá → p = 0
+      const rango = vh * tramo;           // desde - hasta
       const r = slide.getBoundingClientRect();
       const centro = r.top + r.height / 2;
       let p = (desde - centro) / rango;
