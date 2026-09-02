@@ -694,6 +694,11 @@ const poemCard = document.getElementById('poemCard');
 // El efecto también se apaga solo si el sistema pide menos movimiento
 // (prefers-reduced-motion).
 //
+// Cada poema se teclea UNA vez, cuando entra en pantalla al hacer scroll.
+// Una vez completo queda fijo y quieto; no se borra ni se reescribe. Como
+// el tecleo arranca recién cuando el poema aparece, normalmente solo hay
+// uno animándose por vez y el resto están enteros.
+//
 // Para ajustar el ritmo sin desactivarlo, tocá los tiempos de abajo (en
 // milisegundos):
 //   TYPE_CHAR_MS        - lo que tarda cada letra (más alto = más lento)
@@ -703,29 +708,6 @@ const poemCard = document.getElementById('poemCard');
 //                         suspensivos y punto y coma (. ! ? … ;)
 //   TYPE_COMMA_PAUSE    - pausa media en las paradas suaves: coma y dos
 //                         puntos (, :)
-//
-// BORRADO POR INACTIVIDAD (prueba):
-//   Con ESCRITURA_CONSTANTE en true, un poema ya tecleado queda quieto y
-//   completo mientras la persona esté "presente". Si NO hay ninguna señal
-//   de actividad —ni scroll, ni mover el cursor, ni rueda, ni teclas, ni
-//   toques— durante TYPE_IDLE_BORRAR_MS (12 s), el poema visible se borra
-//   solo —de atrás hacia adelante, letra por letra, tomándose también las
-//   pausas en los puntos y las comas, aunque sea al revés— y después se
-//   vuelve a teclear desde cero.
-//   Cualquier actividad reinicia esa cuenta de 12 s. Y si llega mientras
-//   el poema se está borrando, el borrado se FRENA en el acto y el poema
-//   se vuelve a completar desde donde había quedado (no reinicia de cero).
-//   El ciclo se repite: al terminar de (re)escribirse, arranca de nuevo
-//   la cuenta de inactividad.
-//   Con ESCRITURA_CONSTANTE en false se teclea una sola vez y queda fijo.
-//   Tiempos del borrado (ms):
-//     TYPE_ERASE_MS       - lo que tarda en borrarse cada letra (las
-//                           pausas de punto y coma se respetan igual)
-//     TYPE_IDLE_BORRAR_MS - cuánto hay que estar sin actividad para que
-//                           el poema empiece a borrarse
-//     TYPE_EMPTY_MS       - pausa con el poema vacío antes de reescribirlo
-//     SCROLL_RESET_MS     - cada cuánto, como mucho, la actividad seguida
-//                           (mousemove sobre todo) se procesa
 // =====================================================================
 const EFECTO_ESCRITURA = true;
 
@@ -733,12 +715,6 @@ const TYPE_CHAR_MS = 33;
 const TYPE_LINE_PAUSE = 280;
 const TYPE_SENTENCE_PAUSE = 900;
 const TYPE_COMMA_PAUSE = 370;
-
-const ESCRITURA_CONSTANTE = true;
-const TYPE_ERASE_MS = 32;
-const TYPE_IDLE_BORRAR_MS = 12000;
-const TYPE_EMPTY_MS = 700;
-const SCROLL_RESET_MS = 200;
 const PUNTO = /[.!?…;]/;         // parada fuerte (. ! ? … ;): pausa larga
 const COMA = /[,:]/;             // parada suave (, :): pausa media
 const FIN_ORACION = /[.!?…;]$/;  // el verso cierra una oración (o punto y coma)
@@ -781,206 +757,53 @@ function markMosaicReady() {
 // poemas después de unos segundos para que la página no quede muda.
 setTimeout(markMosaicReady, 8000);
 
+// Cuánto esperar después de teclear una letra según qué signo se acaba de
+// escribir: pausa larga en las paradas fuertes (. ! ? … ;), media en las
+// suaves (, :), y el ritmo normal (TYPE_CHAR_MS) en cualquier otro caso.
+function pausaTrasSigno(ch) {
+  if (ch && PUNTO.test(ch)) return TYPE_SENTENCE_PAUSE;
+  if (ch && COMA.test(ch)) return TYPE_COMMA_PAUSE;
+  return TYPE_CHAR_MS;
+}
+
 // efecto escritura: teclea de verdad un poema. Recorre en orden sus
 // elementos "tecleables" (título y versos, guardados en
 // article._typeTargets con su texto en dataset.full) y va escribiendo
-// cada uno carácter a carácter. Mientras una línea se teclea (o se borra)
-// lleva la clase .typing, que en style.css le dibuja un cursor
-// parpadeante al final.
-//
-// article._twEstado lleva en qué anda el poema: 'escribiendo', 'listo'
-// (tecleado y quieto) o 'borrando'. Solo un poema en 'listo' arranca la
-// cuenta de inactividad que lo borra y lo reescribe (ver
-// programarBorradoOcioso más abajo).
+// cada uno carácter a carácter. Mientras una línea se teclea lleva la
+// clase .typing, que en style.css le dibuja un cursor parpadeante al
+// final. Se llama una sola vez por poema, cuando entra en pantalla.
+function runTypewriter(article) {
+  const targets = (article && article._typeTargets) || [];
+  if (targets.length === 0) return;
+  if (article._typing) return; // ya arrancó: no teclear encima
+  article._typing = true;
 
-// Cuánto esperar después de una letra según qué signo se acaba de tocar:
-// pausa larga en punto, media en coma / punto y coma / dos puntos, y el
-// ritmo normal en cualquier otro caso. `base` es ese ritmo normal (el del
-// tecleo al escribir, o el del borrado al borrar).
-function pausaTrasSigno(ch, base) {
-  if (ch && PUNTO.test(ch)) return TYPE_SENTENCE_PAUSE;
-  if (ch && COMA.test(ch)) return TYPE_COMMA_PAUSE;
-  return base;
-}
-
-// Cada pasada (teclear o borrar) lleva un número de generación
-// (article._twGen). Si algo la cancela —por ejemplo, la persona mueve el
-// cursor mientras el poema se está borrando— se sube ese número y la
-// pasada vieja, al despertar de su próximo setTimeout, ve que ya no es la
-// vigente y se corta sola.
-
-// Teclea los targets de un poema. Reanuda desde lo que cada verso ya
-// tenga escrito (útil cuando venimos de frenar un borrado a mitad de
-// camino) y llama a onDone al terminar.
-function escribirTodo(targets, gen, article, onDone) {
   let ti = 0;
   (function typeElement() {
-    if (article._twGen !== gen) return;
-    if (ti >= targets.length) { if (onDone) onDone(); return; }
+    if (ti >= targets.length) return;
     const el = targets[ti];
     const full = el.dataset.full || '';
-    // Si lo que hay ya es un prefijo de full, seguí desde ahí; si no,
-    // arrancá de cero. Un verso ya completo se saltea sin tocarlo.
-    let ci = full.startsWith(el.textContent) ? el.textContent.length : 0;
-    if (ci >= full.length) {
-      el.classList.remove('typing');
-      ti++;
-      typeElement();
-      return;
-    }
     el.classList.add('typing');
+    let ci = 0;
     (function typeChar() {
-      if (article._twGen !== gen) return;
       el.textContent = full.slice(0, ci);
       if (ci < full.length) {
-        // efecto escritura: si la letra recién tecleada fue un punto o una
-        // coma y todavía queda verso por delante, frená un momento.
+        // si la letra recién tecleada fue un punto o una coma y todavía
+        // queda verso por delante, frená un momento antes de seguir.
         const recien = ci > 0 ? full[ci - 1] : '';
         ci++;
-        setTimeout(typeChar, pausaTrasSigno(recien, TYPE_CHAR_MS));
+        setTimeout(typeChar, pausaTrasSigno(recien));
       } else {
         el.classList.remove('typing');
         ti++;
-        // efecto escritura: pausa larga si el verso cierra una oración,
-        // pausa corta si solo es un salto de línea dentro de la frase.
+        // pausa larga si el verso cierra una oración, pausa corta si solo
+        // es un salto de línea dentro de la frase.
         const cierraOracion = FIN_ORACION.test(full.replace(/["'»)\]]+$/, ''));
         setTimeout(typeElement, cierraOracion ? TYPE_SENTENCE_PAUSE : TYPE_LINE_PAUSE);
       }
     })();
   })();
 }
-
-// Borra los targets del último al primero, letra por letra. Aunque vaya
-// al revés, se toma las mismas pausas: si al sacar una letra la que queda
-// expuesta al final es un punto o una coma, frena igual que al escribir.
-function borrarTodo(targets, gen, article, onDone) {
-  let ti = targets.length - 1;
-  (function eraseElement() {
-    if (article._twGen !== gen) return;
-    if (ti < 0) { if (onDone) onDone(); return; }
-    const el = targets[ti];
-    el.classList.add('typing');
-    (function eraseChar() {
-      if (article._twGen !== gen) return;
-      const txt = el.textContent;
-      if (txt.length > 0) {
-        const quedan = txt.slice(0, -1);
-        el.textContent = quedan;
-        const ultimo = quedan ? quedan[quedan.length - 1] : '';
-        setTimeout(eraseChar, pausaTrasSigno(ultimo, TYPE_ERASE_MS));
-      } else {
-        el.classList.remove('typing');
-        ti--;
-        // pausa entre versos, al revés: si el verso de arriba (el que sigue
-        // en borrarse) cierra una oración, respirá antes de atacarlo.
-        const prev = ti >= 0 ? (targets[ti].dataset.full || '') : '';
-        const cierraOracion = FIN_ORACION.test(prev.replace(/["'»)\]]+$/, ''));
-        setTimeout(eraseElement, cierraOracion ? TYPE_SENTENCE_PAUSE : TYPE_LINE_PAUSE);
-      }
-    })();
-  })();
-}
-
-function runTypewriter(article) {
-  const targets = (article && article._typeTargets) || [];
-  if (targets.length === 0) return;
-  // Ya se está tecleando o borrando: no arrancar otra pasada encima.
-  if (article._twEstado === 'escribiendo' || article._twEstado === 'borrando') return;
-  article._twEstado = 'escribiendo';
-  article._twGen = (article._twGen || 0) + 1;
-  const gen = article._twGen;
-  escribirTodo(targets, gen, article, () => {
-    if (article._twGen !== gen) return;
-    article._twEstado = 'listo';
-    programarBorradoOcioso(article);
-  });
-}
-
-// BORRADO POR INACTIVIDAD: borra el poema y lo vuelve a teclear, y al
-// terminar deja armada otra cuenta de inactividad. Solo aplica a un poema
-// que ya terminó de escribirse ('listo').
-function reescribirCiclo(article) {
-  const targets = (article && article._typeTargets) || [];
-  if (targets.length === 0) return;
-  if (article._twEstado !== 'listo') return;
-  article._twEstado = 'borrando';
-  article._twGen = (article._twGen || 0) + 1;
-  const gen = article._twGen;
-  borrarTodo(targets, gen, article, () => {
-    if (article._twGen !== gen) return;
-    article._twEstado = 'escribiendo';
-    setTimeout(() => {
-      if (article._twGen !== gen) return;
-      escribirTodo(targets, gen, article, () => {
-        if (article._twGen !== gen) return;
-        article._twEstado = 'listo';
-        programarBorradoOcioso(article);
-      });
-    }, TYPE_EMPTY_MS);
-  });
-}
-
-// Si el poema se está borrando y algo lo interrumpe (la persona mueve el
-// cursor o scrollea), cortá el borrado y volvé a teclear desde donde
-// quedó hasta completarlo.
-function frenarBorradoYCompletar(article) {
-  if (article._twEstado !== 'borrando') return;
-  if (article._idleTimer) { clearTimeout(article._idleTimer); article._idleTimer = null; }
-  article._twGen = (article._twGen || 0) + 1;
-  const gen = article._twGen;
-  article._twEstado = 'escribiendo';
-  escribirTodo(article._typeTargets || [], gen, article, () => {
-    if (article._twGen !== gen) return;
-    article._twEstado = 'listo';
-    programarBorradoOcioso(article);
-  });
-}
-
-// BORRADO POR INACTIVIDAD: (re)arranca la cuenta de TYPE_IDLE_BORRAR_MS
-// para un poema. Si al vencer el poema sigue 'listo' y visible, dispara el
-// ciclo borrar + reescribir; si quedó fuera de pantalla, vuelve a esperar.
-// Cualquier actividad de la persona llama a esto de nuevo y reinicia la cuenta.
-function programarBorradoOcioso(article) {
-  if (!EFECTO_ESCRITURA || !ESCRITURA_CONSTANTE || prefersReducedMotion) return;
-  if (article._idleTimer) clearTimeout(article._idleTimer);
-  article._idleTimer = setTimeout(() => {
-    article._idleTimer = null;
-    if (article._twEstado !== 'listo') return;
-    if (!poemaEnPantalla(article)) { programarBorradoOcioso(article); return; }
-    reescribirCiclo(article);
-  }, TYPE_IDLE_BORRAR_MS);
-}
-
-// ¿Este poema está, aunque sea en parte, dentro de la pantalla?
-function poemaEnPantalla(el) {
-  const r = el.getBoundingClientRect();
-  return r.bottom > 0 && r.top < (window.innerHeight || document.documentElement.clientHeight);
-}
-
-// BORRADO POR INACTIVIDAD: cualquier señal de que la persona está ahí
-// —scroll, mover el cursor, la rueda del mouse, una tecla, un toque en la
-// pantalla— cuenta como actividad. Con cada actividad:
-//   - un poema que se está BORRANDO frena y vuelve a completarse;
-//   - un poema 'listo' reinicia su cuenta de 12 s.
-// Así, mientras la persona se mueve, ningún poema se borra. Las señales
-// que llegan seguidas (mousemove sobre todo) se juntan: como mucho un
-// disparo cada SCROLL_RESET_MS.
-let actividadPend = false;
-function alHaberActividad() {
-  if (!EFECTO_ESCRITURA || !ESCRITURA_CONSTANTE || prefersReducedMotion) return;
-  if (actividadPend) return;
-  actividadPend = true;
-  setTimeout(() => {
-    actividadPend = false;
-    poemCard.querySelectorAll('.poem').forEach(article => {
-      if (article._twEstado === 'borrando') frenarBorradoYCompletar(article);
-      else if (article._twEstado === 'listo') programarBorradoOcioso(article);
-    });
-  }, SCROLL_RESET_MS);
-}
-['scroll', 'mousemove', 'pointermove', 'wheel', 'keydown', 'touchstart'].forEach(ev => {
-  window.addEventListener(ev, alHaberActividad, { passive: true });
-});
 
 function renderPoemList(poems) {
   poemCard.innerHTML = '';
