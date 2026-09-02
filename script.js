@@ -1145,7 +1145,7 @@ loadSeasonPoem(CURRENT_SEASON);
 // =====================================================================
 const EFECTO_TEXTURAS = true;
 const TEXTURAS_MODO = 'scroll'; // 'scroll' | 'constante'
-const TEXTURAS_SCROLL_TRAMO = 2;
+const TEXTURAS_SCROLL_TRAMO = 4;
 const TEXTURAS_IMAGE_PATHS = [
   'assets/imagenes/textura-otono-01.jpeg',
   'assets/imagenes/textura-otono-02.jpeg',

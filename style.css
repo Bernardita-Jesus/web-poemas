@@ -394,12 +394,18 @@ body::after {
   padding: 18vh 0;
   /* el desliz lateral de cada foto no debe generar scroll horizontal */
   overflow: hidden;
+  /* Ancho en pantalla de UNA columna del mosaico: el canvas ocupa 100vw
+     repartido en 13 columnas (TARGET_WIDTH 1600 / tileW 120, redondeado;
+     ver script.js y .poem-card). Las fotos se miden como múltiplos de
+     esta columna para que peguen con la grilla del mosaico. */
+  --col: calc(100vw / 13);
 }
 .textura-capa:empty { display: none; }
 
 .textura-slide {
   margin: 0;
-  width: min(720px, 86vw);
+  /* 7 columnas de la grilla del mosaico de ancho */
+  width: calc(var(--col) * 7);
   will-change: transform;
   /* Para que se lean más como textura y menos como foto suelta se puede
      descomentar esto (multiplica los colores contra el mosaico): */
@@ -411,12 +417,12 @@ body::after {
 .textura-slide img {
   display: block;
   width: 100%;
-  /* alto según el recorte propio de cada foto (formato apaisado, bien
-     bajo). El tope solo evita que una foto más alta de lo previsto ocupe
-     de más; al llegar a él la foto se achica manteniendo su proporción,
-     nunca se recorta. */
+  /* misma proporción que un recorte del mosaico: tileW 120 x tileH 60
+     (ver index.html) = 2:1. La foto se recorta a esa proporción con
+     object-fit, así todas quedan igual de apaisadas que la grilla. */
+  aspect-ratio: 2 / 1;
   height: auto;
-  max-height: 22vh;
+  object-fit: cover;
   border-radius: 3px;
   box-shadow: 0 24px 50px -22px rgba(150, 125, 40, .4);
 }
