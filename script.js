@@ -1,6 +1,11 @@
 let uploadedImages = [];
 let mosaicCanvas = null;
 
+// Lo usan los dos efectos (escritura y mosaico): si el sistema pide
+// menos movimiento, se apagan solos.
+const prefersReducedMotion = !!(window.matchMedia &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
 // efecto escritura: el tecleo de los poemas no arranca hasta que el
 // mosaico de fondo terminó de dibujarse. Hasta entonces, los poemas que
 // ya entraron en pantalla esperan su turno en esta cola.
@@ -39,6 +44,62 @@ const jitterVal = document.getElementById('jitterVal');
 // pizca de aleatoriedad para que las bandas no queden perfectamente lisas.
 const SORT_MODE = 'brightness';
 const SORT_JITTER = 0.15;
+
+// =====================================================================
+// EFECTO MOSAICO (opcional)
+// ---------------------------------------------------------------------
+// Una vez dibujado el mosaico de fondo (el de recortes fijos, que es el
+// que usa la home), algunos cuadrados van cambiando de a poco y sin
+// parar, así la imagen "respira" en lugar de quedar congelada.
+//
+// Hay dos modos, se elige con MOSAICO_MODO:
+//
+//   'desliz'      (actual) - cada cuadrado sale de una foto más grande y,
+//                 en esa foto, tiene un recorte real pegado al lado. El
+//                 cuadrado se desliza muy despacio dentro de su foto y va
+//                 mostrando ese recorte contiguo. Por ahora solo se
+//                 desliza hacia los lados (izquierda o derecha), nunca
+//                 arriba/abajo. El paneo es acumulativo: cada cuadrado se
+//                 pasea horizontalmente por su propia foto. Al iniciar, el
+//                 efecto arranca "en caliente": ya hay una tanda de
+//                 cuadrados deslizándose desde el primer momento.
+//
+//   'intercambio'          - cada cuadrado se intercambia de golpe (sin
+//                 fundido) con un vecino de la grilla: arriba, abajo,
+//                 izquierda o derecha. El conjunto de recortes no cambia,
+//                 solo se reordenan. Es más brusco y más movido.
+//
+// PARA DESACTIVARLO: poné EFECTO_MOSAICO en false. El mosaico queda
+// quieto como antes. No hace falta tocar nada más.
+//
+// También se apaga solo si el sistema pide menos movimiento
+// (prefers-reduced-motion).
+//
+// Ajustes:
+//   MOSAICO_CAMBIO_PORCENTAJE - qué proporción del mosaico se toca en cada
+//                               ciclo (5 = 5% de los cuadrados)
+//   MOSAICO_CAMBIO_INTERVALO  - cuánto dura ese ciclo, en milisegundos
+//                               (más alto = cambios más espaciados)
+//   MOSAICO_DESLIZ_MS         - cuánto tarda un cuadrado en deslizarse
+//                               hasta el recorte de al lado (modo 'desliz')
+// =====================================================================
+const EFECTO_MOSAICO = true;
+const MOSAICO_MODO = 'desliz'; // 'desliz' | 'intercambio'
+const MOSAICO_CAMBIO_PORCENTAJE = 5;
+const MOSAICO_CAMBIO_INTERVALO = 5000;
+const MOSAICO_DESLIZ_MS = 15000;
+
+// El ciclo se reparte en pasos chiquitos de este tamaño para que los
+// cambios se sientan graduales y no como un parpadeo de golpe.
+const MOSAICO_PASO_MS = 260;
+
+// Estado del efecto en curso (o null si está apagado / sin arrancar).
+let mosaicoDrift = null;
+
+// Fotos normalizadas (canvas WORK_DIM x WORK_DIM) de las que salió cada
+// recorte. El modo 'desliz' las necesita para panear dentro de la foto
+// original; se llenan al armar el mosaico.
+let mosaicSources = [];
 
 variableSizesCheckbox.addEventListener('change', () => {
   const on = variableSizesCheckbox.checked;
@@ -218,6 +279,10 @@ function buildMosaic() {
     return cx;
   });
 
+  // efecto mosaico (modo 'desliz'): guardamos las fotos normalizadas para
+  // poder deslizarnos dentro de ellas más tarde.
+  mosaicSources = normalized.map(cx => cx.canvas);
+
   const colsUnits = Math.floor(WORK_DIM / tileW);
   const rowsUnits = Math.floor(WORK_DIM / tileH);
 
@@ -261,7 +326,10 @@ function buildMosaic() {
         const avg = actx.getImageData(0, 0, 1, 1).data;
         const hsb = rgbToHsb(avg[0], avg[1], avg[2]);
         const tileData = cx.getImageData(job.px, job.py, job.w, job.h);
-        tiles.push({ imgData: tileData, w: job.w, h: job.h, h_: hsb.h, s: hsb.s, bri: hsb.bri });
+        // imgIdx / srcX / srcY: de qué foto y de qué posición salió el
+        // recorte, para que el modo 'desliz' pueda panear dentro de ella.
+        tiles.push({ imgData: tileData, w: job.w, h: job.h, h_: hsb.h, s: hsb.s, bri: hsb.bri,
+                     imgIdx: job.imgIdx, srcX: job.px, srcY: job.py });
       }
       cursor = end;
       processBtn.textContent = 'Procesando… ' + Math.round((cursor / totalTiles) * 100) + '%';
@@ -376,11 +444,157 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
     }
     if (i < total) {
       setTimeout(drawStep, 0);
-    } else if (onDone) {
-      onDone();
+    } else {
+      // efecto mosaico: con el fondo ya dibujado, dejamos que algunos
+      // cuadrados se vayan cambiando de a poco (ver EFECTO_MOSAICO).
+      startMosaicDrift(ctx, tiles, n, tileW, tileH, cols, total);
+      if (onDone) onDone();
     }
   }
   drawStep();
+}
+
+// efecto mosaico: arranca (o reinicia) el cambio gradual de cuadrados
+// sobre el canvas ya dibujado. Un reloj interno corre en pasos chicos y,
+// en cada paso, toca unos pocos cuadrados según el modo elegido.
+function startMosaicDrift(ctx, tiles, n, tileW, tileH, cols, total) {
+  stopMosaicDrift();
+  if (!EFECTO_MOSAICO || prefersReducedMotion) return;
+  if (total === 0 || cols === 0) return;
+
+  // Qué celda muestra cada recorte (misma regla que el dibujado: las
+  // celdas sobrantes reflejan el final del array). Para el modo 'desliz'
+  // guardamos una copia por celda del origen del paneo, así cada una se
+  // pasea por su foto sin pisar a las demás.
+  let cellPan = null;
+  if (MOSAICO_MODO === 'desliz') {
+    cellPan = new Array(total);
+    for (let i = 0; i < total; i++) {
+      let idx = i;
+      if (idx >= n) idx = Math.max(0, 2 * n - 1 - idx);
+      const t = tiles[idx];
+      cellPan[i] = t ? { imgIdx: t.imgIdx, srcX: t.srcX, srcY: t.srcY, moviendo: false } : null;
+    }
+  }
+
+  // Cuántos cuadrados tocar por paso: el porcentaje pedido repartido a lo
+  // largo del ciclo. La fracción sobrante se acumula para que, aun con
+  // números chicos, el cambio termine ocurriendo.
+  const porPaso = (total * MOSAICO_CAMBIO_PORCENTAJE / 100) *
+                  (MOSAICO_PASO_MS / MOSAICO_CAMBIO_INTERVALO);
+  let acum = 0;
+
+  const state = { ctx, tileW, tileH, cols, total, cellPan, seedTimers: [] };
+  const paso = MOSAICO_MODO === 'desliz' ? deslizarEnLaFoto : intercambiarConVecino;
+  state.timer = setInterval(() => {
+    acum += porPaso;
+    let cuantos = Math.floor(acum);
+    acum -= cuantos;
+    while (cuantos-- > 0) paso(state);
+  }, MOSAICO_PASO_MS);
+  mosaicoDrift = state;
+
+  // Arranque "en caliente" (modo 'desliz'): en vez de esperar a que el
+  // reloj vaya sumando deslizamientos de a poco, largamos ya una tanda del
+  // tamaño que tendría en régimen, con demoras al azar repartidas en la
+  // duración de un deslizamiento. Así, apenas se dibuja el mosaico, ya hay
+  // cuadrados en movimiento y a distintas alturas del recorrido.
+  if (MOSAICO_MODO === 'desliz') {
+    const enRegimen = Math.round((total * MOSAICO_CAMBIO_PORCENTAJE / 100) *
+                                 (MOSAICO_DESLIZ_MS / MOSAICO_CAMBIO_INTERVALO));
+    for (let k = 0; k < enRegimen; k++) {
+      state.seedTimers.push(setTimeout(() => paso(state), Math.random() * MOSAICO_DESLIZ_MS));
+    }
+  }
+}
+
+function stopMosaicDrift() {
+  if (mosaicoDrift) {
+    if (mosaicoDrift.timer) clearInterval(mosaicoDrift.timer);
+    (mosaicoDrift.seedTimers || []).forEach(clearTimeout);
+  }
+  mosaicoDrift = null;
+}
+
+// efecto mosaico: elige una celda al azar y la intercambia con una
+// vecina —arriba, abajo, izquierda o derecha—. El cambio es instantáneo:
+// se leen los dos cuadrados y se vuelven a pintar cruzados, sin fundido.
+// El conjunto de recortes no cambia: solo se reordenan.
+function intercambiarConVecino(state) {
+  const { total, cols, tileW, tileH, ctx } = state;
+  const rows = Math.round(total / cols);
+
+  const celda = Math.floor(Math.random() * total);
+  const c = celda % cols;
+  const r = Math.floor(celda / cols);
+
+  const vecinas = [];
+  if (r > 0)         vecinas.push([c, r - 1]);
+  if (r < rows - 1)  vecinas.push([c, r + 1]);
+  if (c > 0)         vecinas.push([c - 1, r]);
+  if (c < cols - 1)  vecinas.push([c + 1, r]);
+  if (vecinas.length === 0) return;
+
+  const [vc, vr] = vecinas[Math.floor(Math.random() * vecinas.length)];
+  const ax = c * tileW,  ay = r * tileH;
+  const bx = vc * tileW, by = vr * tileH;
+
+  const imgA = ctx.getImageData(ax, ay, tileW, tileH);
+  const imgB = ctx.getImageData(bx, by, tileW, tileH);
+  ctx.putImageData(imgB, ax, ay);
+  ctx.putImageData(imgA, bx, by);
+}
+
+// efecto mosaico (modo 'desliz'): elige una celda al azar y desliza
+// despacio su ventana de recorte dentro de la foto original, un cuadrado
+// hacia arriba, abajo, izquierda o derecha, revelando el recorte que en
+// esa foto está pegado al lado. El paneo es acumulativo: la celda queda
+// apuntando al recorte nuevo y la próxima vez sigue desde ahí.
+function deslizarEnLaFoto(state) {
+  const { ctx, tileW, tileH, cols, total, cellPan } = state;
+  if (!cellPan) return;
+
+  const celda = Math.floor(Math.random() * total);
+  const pan = cellPan[celda];
+  if (!pan || pan.moviendo) return;
+
+  const src = mosaicSources[pan.imgIdx];
+  if (!src) return;
+  const dim = src.width; // foto normalizada, cuadrada (WORK_DIM)
+
+  // Direcciones que no se salen de la foto original. Por ahora solo
+  // horizontal: izquierda o derecha. Para volver a habilitar arriba/abajo
+  // descomentar las dos líneas verticales.
+  const dirs = [];
+  if (pan.srcX - tileW >= 0)            dirs.push([-tileW, 0]);
+  if (pan.srcX + 2 * tileW <= dim)      dirs.push([tileW, 0]);
+  // if (pan.srcY - tileH >= 0)            dirs.push([0, -tileH]);
+  // if (pan.srcY + 2 * tileH <= dim)      dirs.push([0, tileH]);
+  if (dirs.length === 0) return;
+  const [dx, dy] = dirs[Math.floor(Math.random() * dirs.length)];
+
+  const cellX = (celda % cols) * tileW;
+  const cellY = Math.floor(celda / cols) * tileH;
+  const fromX = pan.srcX, fromY = pan.srcY;
+  const toX = fromX + dx, toY = fromY + dy;
+  pan.moviendo = true;
+  const inicio = performance.now();
+
+  function frame(ahora) {
+    let t = Math.min(1, (ahora - inicio) / MOSAICO_DESLIZ_MS);
+    const e = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // suaviza arranque y frenada
+    const sX = fromX + (toX - fromX) * e;
+    const sY = fromY + (toY - fromY) * e;
+    ctx.drawImage(src, sX, sY, tileW, tileH, cellX, cellY, tileW, tileH);
+    if (t < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      pan.srcX = toX;
+      pan.srcY = toY;
+      pan.moviendo = false;
+    }
+  }
+  requestAnimationFrame(frame);
 }
 
 // ---------------------------------------------------------------------
@@ -470,8 +684,8 @@ const TYPE_LINE_PAUSE = 340;
 const TYPE_SENTENCE_PAUSE = 1150;
 const PUNTO = /[.!?…]/;          // corta el ritmo dondequiera que aparezca
 const FIN_ORACION = /[.!?…]$/;   // el verso cierra una oración
-const prefersReducedMotion = !!(window.matchMedia &&
-  window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+// prefersReducedMotion está definido arriba de todo (lo comparten los
+// dos efectos).
 
 // efecto escritura: decide qué hacer con un poema que acaba de entrar en
 // pantalla. Si el efecto está apagado (o el sistema pide menos

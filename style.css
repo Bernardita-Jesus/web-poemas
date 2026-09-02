@@ -242,6 +242,11 @@ body {
   flex-direction: column;
   justify-content: space-between;
   padding: 10vh 0;
+  /* Ancho de una columna del mosaico en pantalla: el canvas se muestra
+     al 100% del viewport y tiene 13 columnas (TARGET_WIDTH 1600 dividido
+     tileW 120, redondeado, en script.js). Se usa para ubicar los poemas
+     respecto de la grilla. */
+  --col: calc(100vw / 13);
 }
 .poem-card:empty {
   display: none;
@@ -260,16 +265,17 @@ body {
   opacity: 1;
   transform: none;
 }
-/* Cada poema arranca cerca del borde del mosaico: los impares pegados
-   al primer cuadrado (izquierda) y los pares al último (derecha). Subir
-   este margen los aleja del borde; bajarlo los pega más. */
+/* Cada poema se separa de las columnas del borde: salta la primera
+   columna entera del mosaico y arranca a un cuarto de la siguiente, o
+   sea 1¼ columnas hacia adentro. Los impares desde la izquierda, los
+   pares desde la derecha. Cambiá el 1.25 para acercarlos o alejarlos. */
 .poem:nth-child(odd) {
   align-self: flex-start;
-  margin-left: 4vw;
+  margin-left: calc(var(--col) * 1.25);
 }
 .poem:nth-child(even) {
   align-self: flex-end;
-  margin-right: 4vw;
+  margin-right: calc(var(--col) * 1.25);
   text-align: right;
 }
 
