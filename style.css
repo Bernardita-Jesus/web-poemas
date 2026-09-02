@@ -409,8 +409,8 @@ body::after {
   position: absolute;
   left: 0;
   margin: 0;
-  /* ancho: al azar por foto, entre 5 y 6 columnas de la grilla del
-     mosaico. script.js lo fija con --w (5, 5,5 o 6 columnas). */
+  /* ancho: al azar por foto, 5 o 6 columnas de la grilla del mosaico.
+     script.js lo fija con --w. */
   width: var(--w, calc(var(--col) * 6));
   will-change: transform;
   /* Para que se lean más como textura y menos como foto suelta se puede
@@ -421,13 +421,12 @@ body::after {
 .textura-slide img {
   display: block;
   width: 100%;
-  /* alto: al azar por foto, entre 2 y 3 recortes del mosaico apilados.
-     Cada recorte mide tileH 60 en el canvas = --col/2 en pantalla
-     (tileW 120 : tileH 60; ver index.html), así que 3 recortes =
-     --col * 1.5 y 2 recortes = --col. script.js lo fija con --h (2, 2,5
-     o 3 recortes). El ancho de la caja manda: la foto se recorta a ella
-     con object-fit. */
-  height: var(--h, calc(var(--col) * 1.5));
+  /* alto: fijo en 2 recortes del mosaico apilados. Cada recorte mide
+     tileH 60 en el canvas = --col/2 en pantalla (tileW 120 : tileH 60;
+     ver index.html), así que 2 recortes = --col. script.js lo fija con
+     --h. El ancho de la caja manda: la foto se recorta a ella con
+     object-fit. */
+  height: var(--h, calc(var(--col) * 1));
   object-fit: cover;
   border-radius: 3px;
   box-shadow: 0 24px 50px -22px rgba(150, 125, 40, .4);

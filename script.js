@@ -1112,10 +1112,11 @@ loadSeasonPoem(CURRENT_SEASON);
 //   - un `top` al azar: las fotos PUEDEN encimarse entre ellas, pero
 //     nunca tapándose más del 50% (control por solape vertical);
 //   - el lado por el que entra al azar (mitad desde cada costado);
-//   - una velocidad de deslizamiento propia (cada foto cruza a un ritmo
-//     distinto, unas más lentas y otras más rápidas);
-//   - un ancho al azar entre 5 y 6 cuadrados de la grilla, y un alto al
-//     azar entre 2 y 3 cuadrados del mosaico (ver style.css).
+//   - una velocidad de deslizamiento propia: unas cruzan más rápido y
+//     otras más lento, y si dos quedan verticalmente cerca se les fuerza
+//     velocidades bien distintas para que no crucen la pantalla pegadas;
+//   - un ancho al azar de 5 o 6 cuadrados de la grilla; el alto es fijo
+//     en 2 cuadrados del mosaico (rectángulos 2x5 o 2x6; ver style.css).
 //
 // En los dos modos cada foto hace el mismo recorrido: CRUZA la pantalla
 // de lado a lado. Entra por un extremo, la atraviesa entera y desaparece
@@ -1196,23 +1197,39 @@ function construirTexturas() {
   for (let i = 0; i < cuantas; i++) dirs.push(i < cuantas / 2 ? -1 : 1);
   barajar(dirs);
 
-  // Anchos posibles, en cuadrados (columnas) de la grilla: 5, 5,5 o 6.
-  const anchos = [5, 5.5, 6];
-  // Altos posibles, en cuadrados (recortes) del mosaico: 2, 2,5 o 3.
-  // Cada recorte mide --col/2 de alto, así que van en unidades de --col.
-  const altos = [1, 1.25, 1.5];
+  // Medidas fijas de cada rectángulo, en cuadrados de la grilla:
+  //   alto  = 2 cuadrados (recortes del mosaico). Cada recorte mide
+  //           --col/2 de alto, así que 2 recortes = --col * 1.
+  //   ancho = 5 o 6 cuadrados (columnas), al azar por foto.
+  const ALTO_CUADRADOS = 1;          // en unidades de --col (= 2 recortes)
+  const anchos = [5, 6];
+
+  // Velocidades: cada foto se desliza a su propio ritmo (factor sobre el
+  // ritmo base; <1 más lenta, >1 más rápida). Además, si una foto queda
+  // cerca de otra en vertical, se le busca una velocidad bien distinta
+  // de esa vecina para que no crucen la pantalla pegadas.
+  const VEL_MIN = 0.55, VEL_SPAN = 1.2;   // vel en [0.55, 1.75]
+  const VEL_DIF_MIN = 0.45;               // separación mínima con una vecina
 
   // Control de solape: trabajamos en px sobre el alto real de la capa
   // (que ya es el de la página: el mosaico terminó de dibujarse). Se
-  // guarda el tramo vertical [a, b] de cada foto ya puesta y se exige que
-  // ninguna tape a otra más del 50% de la más chica de las dos.
+  // guarda el tramo vertical [a, b] y la vel de cada foto ya puesta.
   const colPx = (window.innerWidth || document.documentElement.clientWidth) / 13;
   const pageH = texturaCapa.offsetHeight || document.documentElement.scrollHeight || 1;
   const puestas = [];
+  // ninguna foto tapa a otra más del 50% de la más chica de las dos.
   function solapeOK(a, b) {
     return puestas.every(o => {
       const ov = Math.max(0, Math.min(b, o.b) - Math.max(a, o.a));
       return ov <= 0.5 * Math.min(b - a, o.b - o.a);
+    });
+  }
+  // "vecinas" verticales: se enciman o quedan a menos de medio alto de
+  // separación. Son las que se verían avanzar al lado de esta.
+  function vecinas(a, b) {
+    return puestas.filter(o => {
+      const sep = Math.max(a, o.a) - Math.min(b, o.b); // >0 si hay hueco
+      return sep < 0.5 * Math.min(b - a, o.b - o.a);
     });
   }
 
@@ -1222,29 +1239,39 @@ function construirTexturas() {
     fig.dataset.dir = String(dirs[i]);
     // modo 'constante': desfasaje al azar para que no crucen sincronizadas.
     fig.dataset.fase = Math.random().toFixed(4);
-    // velocidad propia: factor al azar para que cada foto se deslice a un
-    // ritmo distinto (1 = ritmo base; <1 más lenta, >1 más rápida). Lo
-    // usan los dos modos.
-    fig.dataset.vel = (0.6 + Math.random() * 1).toFixed(3);
 
-    // ancho y alto al azar (topes 6 columnas / 3 recortes); ver style.css.
+    // ancho al azar (5 o 6 cuadrados); alto fijo en 2 cuadrados. Ver style.css.
     const w = anchos[Math.floor(Math.random() * anchos.length)];
-    const h = altos[Math.floor(Math.random() * altos.length)];
     fig.style.setProperty('--w', 'calc(var(--col) * ' + w + ')');
-    fig.style.setProperty('--h', 'calc(var(--col) * ' + h + ')');
+    fig.style.setProperty('--h', 'calc(var(--col) * ' + ALTO_CUADRADOS + ')');
 
     // top al azar en [1%, 91%]; se reintenta hasta 40 veces si taparía a
     // otra foto más del 50%. Si no encuentra hueco, se queda con el
     // último intento (peor caso, poco frecuente).
-    const hPx = h * colPx;
+    const hPx = ALTO_CUADRADOS * colPx;
     let topPct, a, b, intento = 0;
     do {
       topPct = 1 + Math.random() * 90;
       a = topPct / 100 * pageH;
       b = a + hPx;
     } while (!solapeOK(a, b) && ++intento < 40);
-    puestas.push({ a, b });
     fig.style.top = topPct.toFixed(2) + '%';
+
+    // velocidad: al azar, pero separada de la de sus vecinas verticales.
+    const cerca = vecinas(a, b);
+    let vel = VEL_MIN + Math.random() * VEL_SPAN;
+    if (cerca.length) {
+      let mejor = vel, mejorDif = -1;
+      for (let t = 0; t < 30; t++) {
+        const cand = VEL_MIN + Math.random() * VEL_SPAN;
+        const dif = Math.min.apply(null, cerca.map(o => Math.abs(cand - o.vel)));
+        if (dif >= VEL_DIF_MIN) { mejor = cand; break; }
+        if (dif > mejorDif) { mejorDif = dif; mejor = cand; }
+      }
+      vel = mejor;
+    }
+    fig.dataset.vel = vel.toFixed(3);
+    puestas.push({ a, b, vel });
 
     const img = new Image();
     // imagen al azar de la lista: se puede repetir.
