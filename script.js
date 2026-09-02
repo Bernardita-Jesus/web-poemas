@@ -1106,15 +1106,17 @@ loadSeasonPoem(CURRENT_SEASON);
 // El mosaico y los poemas quedan igual que antes.
 //
 // No es una franja arriba de la web: la capa cubre toda la altura de la
-// página (la misma que el mosaico) y las fotos aparecen repartidas de
-// arriba a abajo, encima del mosaico.
+// página (la misma que el mosaico) y las fotos se ubican en posiciones
+// AL AZAR a lo largo de todo el scroll. Cada foto sale con:
+//   - un `top` al azar (repartido para que no se encimen);
+//   - el lado por el que entra al azar (mitad desde cada costado);
+//   - un alto al azar, como mucho 3 recortes del mosaico (ver style.css).
 //
 // En los dos modos cada foto hace el mismo recorrido: CRUZA la pantalla
 // de lado a lado. Entra por un extremo, la atraviesa entera y desaparece
-// por el otro (la capa recorta lo que se sale con overflow: hidden). Las
-// impares cruzan hacia la izquierda (entran por la derecha) y las pares
-// hacia la derecha. Lo que cambia entre modos es QUÉ mueve ese cruce, y
-// se elige con TEXTURAS_MODO:
+// por el otro (la capa recorta lo que se sale con overflow: hidden). Lo
+// que cambia entre modos es QUÉ mueve ese cruce, y se elige con
+// TEXTURAS_MODO:
 //
 //   'scroll' (actual) - cada foto se queda quieta en su lugar y solo
 //                avanza en su cruce cuando scrolleás. Su posición
@@ -1166,19 +1168,42 @@ const TEXTURAS_CICLO_MS = 24000;
 
 const texturaCapa = document.getElementById('texturaCapa');
 
+// Fisher-Yates: mezcla el array en el lugar.
+function barajar(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 function construirTexturas() {
   if (!EFECTO_TEXTURAS || !texturaCapa || TEXTURAS_IMAGE_PATHS.length === 0) return;
   if (texturaCapa.children.length) return; // ya armada: no duplicar
   const total = TEXTURAS_IMAGE_PATHS.length;
+
+  // Lado de entrada: mitad desde cada costado, repartidos al azar.
+  const dirs = TEXTURAS_IMAGE_PATHS.map((_, i) => (i < total / 2 ? -1 : 1));
+  barajar(dirs);
+  // Altos posibles, en recortes del mosaico: 2, 2,5 o 3 (tope 3).
+  const altos = [1, 1.25, 1.5];
+
   TEXTURAS_IMAGE_PATHS.forEach((path, i) => {
     const fig = document.createElement('figure');
     fig.className = 'textura-slide';
-    // impares (índice par: 0, 2…) arrancan hacia la izquierda (-1); el
-    // resto hacia la derecha (+1).
-    fig.dataset.dir = i % 2 === 0 ? '-1' : '1';
-    // modo 'constante': desfasaje por foto (0..1 de un ciclo) para que no
-    // vayan todas sincronizadas.
-    fig.dataset.fase = (i / total).toFixed(4);
+    fig.dataset.dir = String(dirs[i]);
+    // modo 'constante': desfasaje al azar para que no crucen sincronizadas.
+    fig.dataset.fase = Math.random().toFixed(4);
+    // Ubicación vertical al azar: la página se parte en `total` franjas y
+    // cada foto cae en un punto cualquiera de su franja (10%–70% de la
+    // franja), así quedan repartidas sin patrón y sin encimarse. El total
+    // se comprime al 92% para que la última no quede pegada al borde de
+    // abajo (donde overflow: hidden la recortaría).
+    const top = (i + 0.1 + Math.random() * 0.6) / total * 92;
+    fig.style.top = top.toFixed(2) + '%';
+    // Alto al azar (como mucho 3 recortes del mosaico); ver style.css.
+    const k = altos[Math.floor(Math.random() * altos.length)];
+    fig.style.setProperty('--h', 'calc(var(--col) * ' + k + ')');
     const img = new Image();
     img.src = path;
     img.alt = '';

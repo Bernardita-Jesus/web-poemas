@@ -376,22 +376,17 @@ body::after {
    poemas quedan igual que antes; esto es una capa nueva encima de la
    imagen de fondo.
 
-   Cubre toda la altura de la página (la misma que el mosaico), con las
-   fotos repartidas de arriba a abajo. No es una franja arriba de la
-   web: aparecen a lo largo de todo el scroll, encima del mosaico. Al
-   scrollear cada foto se desliza en horizontal: las impares desde la
-   izquierda, las pares desde la derecha (ver script.js, bloque "EFECTO
-   TEXTURAS").
+   Cubre toda la altura de la página (la misma que el mosaico). Las fotos
+   se ubican en posiciones AL AZAR a lo largo de todo el scroll (top en %
+   y lado de entrada los pone script.js). No es una franja arriba de la
+   web. Al scrollear cada foto se desliza en horizontal cruzando la
+   pantalla (ver script.js, bloque "EFECTO TEXTURAS").
 --------------------------------------------------------------------- */
 .textura-capa {
   position: absolute;
   inset: 0;
   z-index: 4;
   pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-around;
-  padding: 18vh 0;
   /* el desliz lateral de cada foto no debe generar scroll horizontal */
   overflow: hidden;
   /* Aparece con un fundido cuando ya está armada (JS agrega .lista), así
@@ -408,6 +403,11 @@ body::after {
 .textura-capa.lista { opacity: 1; }
 
 .textura-slide {
+  /* ubicación al azar dentro de la capa: el `top` lo pone script.js. La
+     posición horizontal real la maneja el desliz (transform), así que
+     left queda en 0 como base. */
+  position: absolute;
+  left: 0;
   margin: 0;
   /* 7 columnas de la grilla del mosaico de ancho */
   width: calc(var(--col) * 7);
@@ -416,17 +416,17 @@ body::after {
      descomentar esto (multiplica los colores contra el mosaico): */
   /* mix-blend-mode: multiply; */
 }
-.textura-slide:nth-child(odd)  { align-self: flex-start; }
-.textura-slide:nth-child(even) { align-self: flex-end; }
 
 .textura-slide img {
   display: block;
   width: 100%;
-  /* alto = 4 recortes del mosaico apilados. Cada recorte mide tileH 60
-     en el canvas = --col/2 en pantalla (tileW 120 : tileH 60; ver
-     index.html), así que 4 recortes = --col * 2. El ancho (7 columnas)
-     manda: la foto se recorta a esta caja con object-fit. */
-  height: calc(var(--col) * 2);
+  /* alto: al azar por foto, como mucho 3 recortes del mosaico apilados.
+     Cada recorte mide tileH 60 en el canvas = --col/2 en pantalla
+     (tileW 120 : tileH 60; ver index.html), así que 3 recortes =
+     --col * 1.5. script.js baja ese valor con --h (2 o 2,5 recortes) en
+     algunas fotos. El ancho (7 columnas) manda: la foto se recorta a
+     esta caja con object-fit. */
+  height: var(--h, calc(var(--col) * 1.5));
   object-fit: cover;
   border-radius: 3px;
   box-shadow: 0 24px 50px -22px rgba(150, 125, 40, .4);
