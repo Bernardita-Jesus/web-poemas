@@ -1105,12 +1105,15 @@ loadSeasonPoem(CURRENT_SEASON);
 //
 // Hay dos modos, se elige con TEXTURAS_MODO:
 //
-//   'constante' (actual) - cada foto se desliza en horizontal SIN PARAR,
-//                de un lado a otro, con un vaivén suave. No depende del
-//                scroll: aunque la página esté quieta, las fotos siguen
-//                moviéndose. Las impares arrancan hacia la izquierda y
-//                las pares hacia la derecha, y cada una va desfasada de
-//                las demás para que no se muevan todas al unísono.
+//   'constante' (actual) - cada foto CRUZA la pantalla de lado a lado SIN
+//                PARAR, tipo marquesina. Entra por un extremo, la
+//                atraviesa entera y desaparece por el otro (la capa
+//                recorta lo que se sale); al salir, vuelve a entrar por
+//                donde empezó. No depende del scroll: aunque la página
+//                esté quieta, las fotos siguen cruzando. Las impares
+//                cruzan hacia la izquierda (entran por la derecha) y las
+//                pares hacia la derecha, y cada una va desfasada de las
+//                demás para que no crucen todas juntas.
 //
 //   'scroll'             - la posición horizontal de cada foto sigue al
 //                scroll: entra corrida hacia su lado y se va acomodando
@@ -1126,12 +1129,12 @@ loadSeasonPoem(CURRENT_SEASON);
 // style.css).
 //
 // Ajustes:
-//   TEXTURAS_DESLIZ_MAX - cuántos px se corre cada foto hacia cada lado
-//                         en el extremo del recorrido (amplitud del
-//                         vaivén en 'constante'; corrimiento inicial en
-//                         'scroll'). Más alto = deslizamiento más amplio.
-//   TEXTURAS_CICLO_MS   - solo 'constante': cuánto tarda una foto en ir
-//                         y volver una vez (ms). Más alto = más lento.
+//   TEXTURAS_CICLO_MS   - modo 'constante': cuánto tarda una foto en
+//                         cruzar toda la pantalla una vez (ms). Más alto
+//                         = cruce más lento.
+//   TEXTURAS_DESLIZ_MAX - modo 'scroll': cuántos px se corre cada foto
+//                         hacia su lado al entrar. Más alto = corrimiento
+//                         más marcado.
 //
 // Se apaga solo si el sistema pide menos movimiento
 // (prefers-reduced-motion): las fotos quedan quietas en su lugar.
@@ -1176,9 +1179,13 @@ function construirTexturas() {
   else iniciarDeslizConstante();
 }
 
-// efecto texturas, modo 'constante': un único bucle de animación mueve
-// todas las fotos con un vaivén senoidal que no para nunca. `dir` marca
-// hacia qué lado arranca cada una; `fase` la desincroniza del resto.
+// efecto texturas, modo 'constante': un único bucle de animación cruza
+// todas las fotos de lado a lado, sin parar y en bucle (marquesina).
+// `dir` marca hacia qué lado cruza cada una (+1 hacia la derecha, -1
+// hacia la izquierda); `fase` la desincroniza del resto. El recorrido va
+// de "fuera por un lado" a "fuera por el otro": ancho de la capa + ancho
+// de la foto, así entra y sale del todo. Lo que se sale lo recorta
+// .textura-capa (overflow: hidden).
 function iniciarDeslizConstante() {
   const slides = Array.from(texturaCapa.querySelectorAll('.textura-slide'));
   if (slides.length === 0) return;
@@ -1190,13 +1197,22 @@ function iniciarDeslizConstante() {
 
   const inicio = performance.now();
   function frame(ahora) {
-    const vueltas = (ahora - inicio) / TEXTURAS_CICLO_MS;
+    const anchoCapa = texturaCapa.clientWidth || window.innerWidth;
+    const t = (ahora - inicio) / TEXTURAS_CICLO_MS;
     slides.forEach(slide => {
       const dir = parseFloat(slide.dataset.dir) || -1;
       const fase = parseFloat(slide.dataset.fase) || 0;
-      const dx = dir * TEXTURAS_DESLIZ_MAX *
-                 Math.sin((vueltas + fase) * 2 * Math.PI);
-      slide.style.transform = 'translateX(' + dx.toFixed(1) + 'px)';
+      const w = slide.offsetWidth;
+      const baseLeft = slide.offsetLeft; // posición natural dentro de la capa
+      const recorrido = anchoCapa + w;
+      // p avanza 0→1 sin parar y vuelve a empezar.
+      let p = (t + fase) % 1;
+      if (p < 0) p += 1;
+      // dónde debe quedar el borde izquierdo de la foto: de -w (fuera por
+      // la izquierda) a anchoCapa (fuera por la derecha), o al revés.
+      const objetivoLeft = dir > 0 ? -w + p * recorrido
+                                   : anchoCapa - p * recorrido;
+      slide.style.transform = 'translateX(' + (objetivoLeft - baseLeft).toFixed(1) + 'px)';
     });
     requestAnimationFrame(frame);
   }

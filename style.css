@@ -411,12 +411,12 @@ body::after {
 .textura-slide img {
   display: block;
   width: 100%;
-  /* alto libre: respeta el formato apaisado propio de cada foto. El
-     max-height solo actúa (recortando con object-fit) si alguna viniera
-     demasiado alta. */
+  /* alto según el recorte propio de cada foto (formato apaisado, bien
+     bajo). El tope solo evita que una foto más alta de lo previsto ocupe
+     de más; al llegar a él la foto se achica manteniendo su proporción,
+     nunca se recorta. */
   height: auto;
-  max-height: 42vh;
-  object-fit: cover;
+  max-height: 22vh;
   border-radius: 3px;
   box-shadow: 0 24px 50px -22px rgba(150, 125, 40, .4);
 }
