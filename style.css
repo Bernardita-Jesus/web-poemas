@@ -343,8 +343,10 @@ body {
 
 /* ---------------------------------------------------------------------
    Capa sobre las fotos: un velo translúcido blanco turquesa por encima
-   del mosaico y por debajo de los poemas (z-index 4). Aclara la imagen
-   dándole un tinte turquesa suave.
+   del mosaico y por debajo de la capa de texturas y de los poemas
+   (z-index 2). Aclara la imagen dándole un tinte turquesa suave. Solo
+   tiñe el mosaico: las fotos de la capa de texturas van por encima y
+   quedan sin tinte.
 
    Degradé vertical: el velo es más tenue arriba y se va cerrando hacia
    abajo, dejando la imagen más nítida en la parte superior.
@@ -357,7 +359,7 @@ body::after {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: 4;
+  z-index: 2;
   pointer-events: none;
   background: linear-gradient(
     to bottom,
@@ -365,5 +367,58 @@ body::after {
     rgba(206, 242, 230, .15) 50%,
     rgba(206, 242, 230, .25) 100%
   );
+}
+
+/* ---------------------------------------------------------------------
+   EFECTO TEXTURAS: una capa de fotos horizontales (apaisadas)
+   SUPERPUESTA encima del mosaico. Va por encima del mosaico y del velo
+   turquesa, y por debajo de los poemas (z-index 4). El mosaico y los
+   poemas quedan igual que antes; esto es una capa nueva encima de la
+   imagen de fondo.
+
+   Cubre toda la altura de la página (la misma que el mosaico), con las
+   fotos repartidas de arriba a abajo. No es una franja arriba de la
+   web: aparecen a lo largo de todo el scroll, encima del mosaico. Al
+   scrollear cada foto se desliza en horizontal: las impares desde la
+   izquierda, las pares desde la derecha (ver script.js, bloque "EFECTO
+   TEXTURAS").
+--------------------------------------------------------------------- */
+.textura-capa {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  padding: 18vh 0;
+  /* el desliz lateral de cada foto no debe generar scroll horizontal */
+  overflow: hidden;
+}
+.textura-capa:empty { display: none; }
+
+.textura-slide {
+  margin: 0;
+  width: min(560px, 72vw);
+  will-change: transform;
+  /* Para que se lean más como textura y menos como foto suelta se puede
+     descomentar esto (multiplica los colores contra el mosaico): */
+  /* mix-blend-mode: multiply; */
+}
+.textura-slide:nth-child(odd)  { align-self: flex-start; }
+.textura-slide:nth-child(even) { align-self: flex-end; }
+
+.textura-slide img {
+  display: block;
+  width: 100%;
+  height: min(40vh, 340px);
+  object-fit: cover;
+  border-radius: 3px;
+  box-shadow: 0 24px 50px -22px rgba(150, 125, 40, .4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* sin desliz: las fotos quedan quietas en su lugar */
+  .textura-slide { transform: none !important; }
 }
 
