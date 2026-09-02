@@ -774,6 +774,12 @@ function markMosaicReady() {
   if (mosaicReady) return;
   mosaicReady = true;
   pendingTypewriter.splice(0).forEach(runTypewriter);
+  // efecto texturas: recién ahora la página tiene su alto final (el
+  // canvas del mosaico ya está dibujado), así que es el momento de armar
+  // la capa de texturas. Si se armara antes, las fotos se repartirían
+  // sobre un alto provisorio y después "saltarían" a otro lugar cuando
+  // el mosaico agranda la página.
+  construirTexturas();
 }
 
 // Red de seguridad: si el mosaico nunca llega a terminar (por ejemplo,
@@ -1162,6 +1168,7 @@ const texturaCapa = document.getElementById('texturaCapa');
 
 function construirTexturas() {
   if (!EFECTO_TEXTURAS || !texturaCapa || TEXTURAS_IMAGE_PATHS.length === 0) return;
+  if (texturaCapa.children.length) return; // ya armada: no duplicar
   const total = TEXTURAS_IMAGE_PATHS.length;
   TEXTURAS_IMAGE_PATHS.forEach((path, i) => {
     const fig = document.createElement('figure');
@@ -1181,6 +1188,9 @@ function construirTexturas() {
   });
   if (TEXTURAS_MODO === 'scroll') iniciarDeslizScroll();
   else iniciarDeslizConstante();
+  // fundido de entrada: ya colocadas las fotos, mostramos la capa (ver
+  // .textura-capa / .textura-capa.lista en style.css).
+  requestAnimationFrame(() => texturaCapa.classList.add('lista'));
 }
 
 // efecto texturas: coloca una foto en el punto `p` (0..1) de su cruce de
@@ -1272,7 +1282,11 @@ function iniciarDeslizScroll() {
   actualizar();
 }
 
-construirTexturas();
+// La capa de texturas se arma desde markMosaicReady(), no acá: hay que
+// esperar a que el mosaico termine de dibujarse para que la página tenga
+// su alto final. Si no, las fotos se reparten sobre un alto provisorio y
+// después saltan de lugar. (markMosaicReady tiene su propia red de
+// seguridad a los 8 s por si el mosaico nunca termina.)
 
 function renderFlowMosaic(tiles, rowHeight, minWidth, maxWidth, onDone) {
   // Fixed-height row flow: tiles keep whatever width they were extracted at

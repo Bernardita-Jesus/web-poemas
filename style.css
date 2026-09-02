@@ -394,6 +394,10 @@ body::after {
   padding: 18vh 0;
   /* el desliz lateral de cada foto no debe generar scroll horizontal */
   overflow: hidden;
+  /* Aparece con un fundido cuando ya está armada (JS agrega .lista), así
+     no se ve ningún reacomodo de las fotos al cargar. */
+  opacity: 0;
+  transition: opacity .5s ease;
   /* Ancho en pantalla de UNA columna del mosaico: el canvas ocupa 100vw
      repartido en 13 columnas (TARGET_WIDTH 1600 / tileW 120, redondeado;
      ver script.js y .poem-card). Las fotos se miden como múltiplos de
@@ -401,6 +405,7 @@ body::after {
   --col: calc(100vw / 13);
 }
 .textura-capa:empty { display: none; }
+.textura-capa.lista { opacity: 1; }
 
 .textura-slide {
   margin: 0;
@@ -430,5 +435,7 @@ body::after {
 @media (prefers-reduced-motion: reduce) {
   /* sin desliz: las fotos quedan quietas en su lugar */
   .textura-slide { transform: none !important; }
+  /* la capa aparece de una, sin fundido */
+  .textura-capa { transition: none; }
 }
 
