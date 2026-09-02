@@ -1101,13 +1101,21 @@ loadSeasonPoem(CURRENT_SEASON);
 //
 // No es una franja arriba de la web: la capa cubre toda la altura de la
 // página (la misma que el mosaico) y las fotos aparecen repartidas de
-// arriba a abajo, encima del mosaico. Al hacer scroll cada una se desliza en
-// horizontal: entra corrida hacia un lado —las impares (1ª, 3ª…) desde
-// la izquierda, las pares desde la derecha— y se va acomodando hacia el
-// centro a medida que sube por la pantalla. Nunca queda del todo
-// centrada mientras está visible: recién llega a su posición justo
-// cuando sale por arriba, así el movimiento no se corta en ningún
-// momento del scroll.
+// arriba a abajo, encima del mosaico.
+//
+// Hay dos modos, se elige con TEXTURAS_MODO:
+//
+//   'constante' (actual) - cada foto se desliza en horizontal SIN PARAR,
+//                de un lado a otro, con un vaivén suave. No depende del
+//                scroll: aunque la página esté quieta, las fotos siguen
+//                moviéndose. Las impares arrancan hacia la izquierda y
+//                las pares hacia la derecha, y cada una va desfasada de
+//                las demás para que no se muevan todas al unísono.
+//
+//   'scroll'             - la posición horizontal de cada foto sigue al
+//                scroll: entra corrida hacia su lado y se va acomodando
+//                hacia el centro a medida que sube por la pantalla.
+//                Quieta la página, las fotos quedan quietas.
 //
 // PARA DESACTIVARLO: poné EFECTO_TEXTURAS en false. La capa no se arma y
 // no pasa nada más.
@@ -1118,14 +1126,18 @@ loadSeasonPoem(CURRENT_SEASON);
 // style.css).
 //
 // Ajustes:
-//   TEXTURAS_DESLIZ_MAX - cuántos px se corre la foto hacia su lado en
-//                         el punto más extremo (recién asomada por
-//                         abajo). Más alto = deslizamiento más marcado.
+//   TEXTURAS_DESLIZ_MAX - cuántos px se corre cada foto hacia cada lado
+//                         en el extremo del recorrido (amplitud del
+//                         vaivén en 'constante'; corrimiento inicial en
+//                         'scroll'). Más alto = deslizamiento más amplio.
+//   TEXTURAS_CICLO_MS   - solo 'constante': cuánto tarda una foto en ir
+//                         y volver una vez (ms). Más alto = más lento.
 //
 // Se apaga solo si el sistema pide menos movimiento
 // (prefers-reduced-motion): las fotos quedan quietas en su lugar.
 // =====================================================================
 const EFECTO_TEXTURAS = true;
+const TEXTURAS_MODO = 'constante'; // 'constante' | 'scroll'
 const TEXTURAS_IMAGE_PATHS = [
   'assets/imagenes/textura-otono-01.jpeg',
   'assets/imagenes/textura-otono-02.jpeg',
@@ -1137,17 +1149,22 @@ const TEXTURAS_IMAGE_PATHS = [
   'assets/imagenes/textura-otono-08.jpg',
 ];
 const TEXTURAS_DESLIZ_MAX = 120;
+const TEXTURAS_CICLO_MS = 16000;
 
 const texturaCapa = document.getElementById('texturaCapa');
 
 function construirTexturas() {
   if (!EFECTO_TEXTURAS || !texturaCapa || TEXTURAS_IMAGE_PATHS.length === 0) return;
+  const total = TEXTURAS_IMAGE_PATHS.length;
   TEXTURAS_IMAGE_PATHS.forEach((path, i) => {
     const fig = document.createElement('figure');
     fig.className = 'textura-slide';
-    // impares (índice par: 0, 2…) entran desde la izquierda (-1); el
-    // resto desde la derecha (+1).
+    // impares (índice par: 0, 2…) arrancan hacia la izquierda (-1); el
+    // resto hacia la derecha (+1).
     fig.dataset.dir = i % 2 === 0 ? '-1' : '1';
+    // modo 'constante': desfasaje por foto (0..1 de un ciclo) para que no
+    // vayan todas sincronizadas.
+    fig.dataset.fase = (i / total).toFixed(4);
     const img = new Image();
     img.src = path;
     img.alt = '';
@@ -1155,15 +1172,43 @@ function construirTexturas() {
     fig.appendChild(img);
     texturaCapa.appendChild(fig);
   });
-  iniciarDeslizTexturas();
+  if (TEXTURAS_MODO === 'scroll') iniciarDeslizScroll();
+  else iniciarDeslizConstante();
 }
 
-// efecto texturas: engancha el deslizamiento lateral al scroll. En cada
-// frame de scroll recalcula, por foto, qué tan arriba de la pantalla va
-// su centro y lo traduce en un desplazamiento horizontal que arranca en
-// TEXTURAS_DESLIZ_MAX (foto recién asomada por abajo) y baja a 0 (foto
-// saliendo por arriba).
-function iniciarDeslizTexturas() {
+// efecto texturas, modo 'constante': un único bucle de animación mueve
+// todas las fotos con un vaivén senoidal que no para nunca. `dir` marca
+// hacia qué lado arranca cada una; `fase` la desincroniza del resto.
+function iniciarDeslizConstante() {
+  const slides = Array.from(texturaCapa.querySelectorAll('.textura-slide'));
+  if (slides.length === 0) return;
+
+  if (prefersReducedMotion) {
+    slides.forEach(s => { s.style.transform = 'none'; });
+    return;
+  }
+
+  const inicio = performance.now();
+  function frame(ahora) {
+    const vueltas = (ahora - inicio) / TEXTURAS_CICLO_MS;
+    slides.forEach(slide => {
+      const dir = parseFloat(slide.dataset.dir) || -1;
+      const fase = parseFloat(slide.dataset.fase) || 0;
+      const dx = dir * TEXTURAS_DESLIZ_MAX *
+                 Math.sin((vueltas + fase) * 2 * Math.PI);
+      slide.style.transform = 'translateX(' + dx.toFixed(1) + 'px)';
+    });
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+
+// efecto texturas, modo 'scroll': engancha el deslizamiento lateral al
+// scroll. En cada frame recalcula, por foto, qué tan arriba de la
+// pantalla va su centro y lo traduce en un desplazamiento horizontal que
+// arranca en TEXTURAS_DESLIZ_MAX (foto recién asomada por abajo) y baja a
+// 0 (foto saliendo por arriba).
+function iniciarDeslizScroll() {
   const slides = Array.from(texturaCapa.querySelectorAll('.textura-slide'));
   if (slides.length === 0) return;
 

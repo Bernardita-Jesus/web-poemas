@@ -399,7 +399,7 @@ body::after {
 
 .textura-slide {
   margin: 0;
-  width: min(560px, 72vw);
+  width: min(720px, 86vw);
   will-change: transform;
   /* Para que se lean más como textura y menos como foto suelta se puede
      descomentar esto (multiplica los colores contra el mosaico): */
@@ -411,7 +411,11 @@ body::after {
 .textura-slide img {
   display: block;
   width: 100%;
-  height: min(40vh, 340px);
+  /* alto libre: respeta el formato apaisado propio de cada foto. El
+     max-height solo actúa (recortando con object-fit) si alguna viniera
+     demasiado alta. */
+  height: auto;
+  max-height: 42vh;
   object-fit: cover;
   border-radius: 3px;
   box-shadow: 0 24px 50px -22px rgba(150, 125, 40, .4);
