@@ -5,9 +5,34 @@
 <title>Mosaico por color</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=5">
+<script>
+  // La página tiene que abrir siempre desde arriba del todo. Si el
+  // navegador restaura la posición de scroll de una visita anterior (o
+  // la mueve al recolocarse el contenido mientras carga el mosaico),
+  // los primeros recortes quedan tapados por la barra superior. Esto lo
+  // evita: desactiva la restauración y fuerza el tope al cargar.
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  window.addEventListener('load', function () { window.scrollTo(0, 0); });
+</script>
 </head>
 <body>
+<!-- Barra superior: 5 botones rectangulares, fija arriba. Por ahora solo
+     "Otoño" está activo (es lo que se ve al abrir). Invierno, Primavera
+     y Verano todavía no tienen fotos ni poemas propios, así que sus
+     botones no hacen nada. "Estaciones" abre la intro. La lógica está
+     en script.js, bloque "BARRA DE ESTACIONES". -->
+<nav class="topbar" id="topbar">
+  <button class="topbar-btn" type="button" data-accion="intro">Estaciones</button>
+  <button class="topbar-btn" type="button" data-season="otono">Otoño</button>
+  <button class="topbar-btn" type="button" data-season="invierno">Invierno</button>
+  <button class="topbar-btn" type="button" data-season="primavera">Primavera</button>
+  <button class="topbar-btn" type="button" data-season="verano">Verano</button>
+</nav>
+<!-- Todo el contenido va dentro de .contenido, que arranca justo debajo
+     de la barra (position: sticky, en el flujo). Así el mosaico, los
+     poemas y las texturas nunca quedan tapados por los botones. -->
+<div class="contenido">
 <div class="poem-card" id="poemCard"></div>
 <!-- efecto texturas: capa de fotos apaisadas entre el mosaico y los
      poemas. Se llena desde script.js (bloque "EFECTO TEXTURAS"); vacía
@@ -93,8 +118,20 @@
     <div id="canvas-holder"></div>
   </div>
 </div>
+</div>
+
+<!-- Intro del botón "Estaciones": acá va la explicación de los poemas.
+     Arranca oculto; script.js (bloque "BARRA DE ESTACIONES") lo abre y
+     cierra. Editá el texto de <p> con la explicación real. -->
+<div class="intro-overlay" id="introOverlay" hidden>
+  <div class="intro-panel" role="dialog" aria-modal="true" aria-labelledby="introTitulo">
+    <button class="intro-cerrar" id="introCerrar" type="button" aria-label="Cerrar">&times;</button>
+    <h2 id="introTitulo">Estaciones</h2>
+    <p>Acá irá la explicación de mis poemas.</p>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
-<script src="script.js"></script>
+<script src="script.js?v=5"></script>
 </body>
 </html>

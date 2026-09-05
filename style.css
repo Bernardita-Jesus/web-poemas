@@ -7,6 +7,13 @@
   --amber-text: #4a3c12;
   --text: #4a3f28;
   --text-dim: #96895f;
+  /* Alto de la barra superior = alto de un recorte del mosaico. El
+     canvas se reparte en 13 columnas y cada recorte mide media columna
+     de alto (tileW 120 : tileH 60 en index.html). Lo usa el alto de los
+     botones (.topbar-btn) y, de rebote, el .stage (le descuenta este
+     alto a su min-height). La barra ocupa su lugar en el flujo, así que
+     el mosaico ya arranca solo debajo de los botones. */
+  --barra-alto: calc(100vw / 13 / 2);
 }
 
 * { box-sizing: border-box; }
@@ -17,7 +24,13 @@ html, body {
   color: var(--text);
   font-family: 'IBM Plex Sans', sans-serif;
   min-height: 100%;
-  overflow-x: hidden;
+  /* clip (no 'hidden'): corta el desborde horizontal sin volver a
+     html/body un contenedor de scroll, así la barra superior
+     (position: sticky) sigue pegándose bien al borde de arriba. */
+  overflow-x: clip;
+  /* al dibujarse el mosaico la página cambia mucho de alto; sin esto el
+     navegador puede "anclar" el scroll y moverlo del tope. */
+  overflow-anchor: none;
 }
 
 .wrap {
@@ -200,7 +213,8 @@ button.secondary:disabled {
 }
 .stage {
   padding: 0;
-  min-height: 100vh;
+  /* descuenta el alto de la barra superior, que ya ocupa lugar arriba */
+  min-height: calc(100vh - var(--barra-alto));
 }
 #canvas-holder {
   box-shadow: none;
@@ -233,6 +247,15 @@ body {
   position: relative;
 }
 
+/* Envuelve todo lo que va debajo de la barra superior. Al estar en el
+   flujo, después de la .topbar (position: sticky), arranca justo donde
+   terminan los botones. Es position: relative para que .poem-card y
+   .textura-capa (absolutas, inset: 0) se midan contra este bloque y no
+   contra el body: así ninguna se mete detrás de la barra. */
+.contenido {
+  position: relative;
+}
+
 .poem-card {
   position: absolute;
   inset: 0;
@@ -255,7 +278,7 @@ body {
 .poem {
   pointer-events: auto;
   max-width: min(680px, 90vw);
-  color: #ffffff;
+  color: #e8ff00;
   text-shadow: 0 2px 4px rgba(0, 0, 0, .55), 0 1px 20px rgba(0, 0, 0, .6);
   opacity: 0;
   transform: translateY(28px);
@@ -323,7 +346,7 @@ body {
   width: 0;
   overflow: visible;
   margin-left: 0;
-  color: rgba(255, 255, 255, .9);
+  color: rgba(232, 255, 0, .9);
   animation: caret-blink 1s steps(1, end) infinite;
 }
 @keyframes caret-blink {
@@ -440,4 +463,130 @@ body::after {
   /* la capa aparece de una, sin fundido */
   .textura-capa { transition: none; }
 }
+
+/* ---------------------------------------------------------------------
+   Barra superior: 5 botones rectangulares en fila. Va en el flujo
+   normal, arriba de todo, y con position: sticky queda pegada al borde
+   de arriba al hacer scroll. Como ocupa su lugar en el flujo, el
+   mosaico (y todo lo demás) arranca automáticamente justo debajo de
+   los botones, sin cálculos de por medio. Por ahora es solo maqueta
+   visual: los botones no tienen acción. Los 5 rectángulos reparten el
+   ancho en partes iguales (flex: 1). Para sacarla, borrá el
+   <nav class="topbar"> de index.html.
+
+   Altura: --barra-alto (ver :root), la misma que un recorte del
+   mosaico.
+
+   Colores: cada botón lleva un color distinto (ver .topbar-btn:nth-child
+   más abajo). Cambiá esos valores para otra paleta.
+--------------------------------------------------------------------- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  border-bottom: 1px solid rgba(240, 227, 173, .25);
+}
+.topbar-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  /* alto de un recorte del mosaico */
+  height: var(--barra-alto);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 0;
+  padding: 0 12px;
+  background: transparent;
+  color: var(--bg);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: filter .15s ease;
+}
+/* un color y una estación por botón */
+.topbar-btn:nth-child(1) { background: #6f6480; } /* Estaciones: morado medio grisáceo */
+.topbar-btn:nth-child(2) { background: #efff5c; } /* Otoño: amarillo flúor un poco más claro */
+.topbar-btn:nth-child(3) { background: #a9dcd2; } /* Invierno: celeste medio verde claro */
+.topbar-btn:nth-child(4) { background: #f0b7cf; } /* Primavera: rosadito */
+.topbar-btn:nth-child(5) { background: #3f72b8; } /* Verano: azul */
+/* botones de fondo claro: texto oscuro para que se lea */
+.topbar-btn:nth-child(2),
+.topbar-btn:nth-child(3),
+.topbar-btn:nth-child(4) {
+  color: var(--amber-text);
+}
+.topbar-btn:hover,
+.topbar-btn:focus-visible {
+  filter: brightness(1.06);
+  outline: none;
+}
+/* estación que se está viendo: por ahora siempre "Otoño" (script.js le
+   pone .is-active según CURRENT_SEASON). */
+.topbar-btn.is-active {
+  font-weight: 700;
+  box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .35);
+}
+
+/* ---------------------------------------------------------------------
+   Intro del botón "Estaciones": una ventana centrada, por encima de
+   todo, con la explicación de los poemas. Arranca oculta (atributo
+   hidden); script.js la muestra/oculta. Cerrar: la X, un clic afuera o
+   la tecla Esc.
+--------------------------------------------------------------------- */
+.intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(20, 16, 6, .55);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+/* display: flex de arriba le gana al hidden del navegador; hay que
+   reponerlo para que 'hidden' realmente lo oculte. */
+.intro-overlay[hidden] { display: none; }
+.intro-panel {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  background: var(--panel);
+  border: 1px solid var(--panel-line);
+  border-radius: 6px;
+  padding: 40px 36px;
+  box-shadow: 0 30px 60px -25px rgba(150, 125, 40, .5);
+}
+.intro-panel h2 {
+  font-family: 'Source Serif 4', serif;
+  font-weight: 600;
+  font-size: 26px;
+  margin: 0 0 14px 0;
+  color: var(--text);
+}
+.intro-panel p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.intro-cerrar {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  border: 0;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  padding: 6px 8px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.intro-cerrar:hover { color: var(--text); }
 

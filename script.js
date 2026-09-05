@@ -1169,7 +1169,7 @@ loadSeasonPoem(CURRENT_SEASON);
 // =====================================================================
 const EFECTO_TEXTURAS = true;
 const TEXTURAS_MODO = 'scroll'; // 'scroll' | 'constante'
-const TEXTURAS_CANTIDAD = 12;
+const TEXTURAS_CANTIDAD = 14;
 const TEXTURAS_SCROLL_TRAMO = 4;
 const TEXTURAS_IMAGE_PATHS = [
   'assets/imagenes/textura-otono-01.jpeg',
@@ -1504,3 +1504,47 @@ function renderFlowMosaic(tiles, rowHeight, minWidth, maxWidth, onDone) {
   }
   drawStep();
 }
+
+// =====================================================================
+// BARRA DE ESTACIONES
+// ---------------------------------------------------------------------
+// La barra de arriba (index.html, <nav class="topbar">) tiene 5 botones:
+// "Estaciones" + las 4 estaciones. Por ahora SOLO "Otoño" está activo:
+// es lo que se ve al abrir (poemas de assets/poemas/otono.yaml + mosaico
+// + texturas, todo con fotos de otoño). Invierno, Primavera y Verano
+// todavía no tienen fotos ni poemas propios, así que sus botones no
+// hacen nada. Cuando los tengan, acá se engancha el cambio de estación.
+//
+// "Estaciones" abre una intro (index.html, #introOverlay) donde va la
+// explicación de los poemas.
+// =====================================================================
+(function () {
+  const barra = document.getElementById('topbar');
+  if (!barra) return;
+
+  // Marca visualmente la estación que se está viendo (CURRENT_SEASON).
+  const btnActual = barra.querySelector('[data-season="' + CURRENT_SEASON + '"]');
+  if (btnActual) btnActual.classList.add('is-active');
+
+  const overlay = document.getElementById('introOverlay');
+  const btnCerrar = document.getElementById('introCerrar');
+  const abrirIntro = () => { if (overlay) overlay.hidden = false; };
+  const cerrarIntro = () => { if (overlay) overlay.hidden = true; };
+
+  barra.querySelectorAll('.topbar-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.accion === 'intro') { abrirIntro(); return; }
+      // Estaciones sin fotos/poemas propios: por ahora no hacen nada.
+      // Acá irá loadSeasonPoem(btn.dataset.season) + rearmar el mosaico
+      // cuando existan los assets de esa estación.
+    });
+  });
+
+  if (btnCerrar) btnCerrar.addEventListener('click', cerrarIntro);
+  if (overlay) {
+    overlay.addEventListener('click', e => { if (e.target === overlay) cerrarIntro(); });
+  }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && overlay && !overlay.hidden) cerrarIntro();
+  });
+})();
