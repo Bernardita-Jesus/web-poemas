@@ -456,12 +456,13 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
   // se traduce en una página más larga en vez de un mosaico más cuadrado.
   const TARGET_WIDTH = 1600;
   const cols = Math.max(1, Math.round(TARGET_WIDTH / tileW));
-  // Una fila extra al final: se suma una línea entera de recortes debajo de
-  // la última, sin tocar el tamaño de cada recorte. Esas celdas nuevas caen
-  // en i >= n y se rellenan con la misma regla de reflejo que las sobrantes.
-  // (Para un mosaico más largo se genera MÁS recortes reales por foto; ver
-  // mosaicoDensidad en ESTACIONES / buildMosaic, no filas de relleno acá.)
-  const rows = Math.ceil(n / cols) + 1;
+  // Una fila extra al final (+1) para rellenar la última fila incompleta,
+  // más un ajuste fino por estación (mosaicoFilasAjuste, en filas de
+  // recortes: negativo recorta el mosaico por abajo, positivo lo alarga).
+  // No cambia el tamaño de cada recorte. Las celdas sobrantes (i >= n) se
+  // rellenan reflejando el final del array (ver más abajo).
+  const filasAjuste = (SEASON_CFG && SEASON_CFG.mosaicoFilasAjuste) || 0;
+  const rows = Math.max(1, Math.ceil(n / cols) + 1 + filasAjuste);
   const total = rows * cols; // suele ser > n; las celdas sobrantes de la última fila se rellenan reflejando el final del array (ver más abajo)
 
   const holder = document.getElementById('canvas-holder');
@@ -749,6 +750,9 @@ const ESTACIONES = {
     // para que los poemas tengan más aire entre sí. Subilo para más
     // (1.5, 2...). Ver buildMosaic.
     mosaicoDensidad: 1.25,
+    // ajuste fino del largo del mosaico, en filas de recortes (negativo =
+    // más corto). Ver renderFixedMosaic.
+    mosaicoFilasAjuste: -16,
     // cuántas texturas apaisadas se colocan (mínimo; ver construirTexturas)
     texturasCantidad: 23,
     fotos: [
