@@ -687,8 +687,10 @@ function iniciarDesliz(state) {
 // ---------------------------------------------------------------------
 // ESTACIONES: qué fotos y qué texturas usa cada una. La estación que se
 // muestra se elige con ?estacion=... en la URL; los botones de la barra
-// de arriba la cambian y recargan la página (ver "BARRA DE ESTACIONES"
-// más abajo). Sin parámetro válido se usa ESTACION_POR_DEFECTO.
+// de arriba y los de la pantalla "Estaciones" la cambian y recargan la
+// página (ver "BARRA DE ESTACIONES" más abajo). Sin un parámetro válido
+// NO hay estación elegida: la web arranca en la pantalla "Estaciones",
+// donde se elige otoño o invierno.
 //
 // Los poemas de la estación salen de assets/poemas/<estacion>.yaml.
 // Primavera y Verano todavía no tienen assets, así que sus botones no
@@ -700,6 +702,7 @@ const ESTACIONES = {
     // sentido del degradado por brillo (ver SORT_MODE): claro arriba.
     orden: 'brightness',
     fotos: [
+      'assets/imagenes/otono-04.jpg',
       'assets/imagenes/otono-07.jpg',
       'assets/imagenes/otono-08.jpg',
       'assets/imagenes/otono-09.jpg',
@@ -739,23 +742,35 @@ const ESTACIONES = {
     ],
   },
 };
-const ESTACION_POR_DEFECTO = 'invierno';
-
 // Estación pedida por la URL (?estacion=otono). Si no es una de las que
-// tienen assets, se cae a la de por defecto.
+// tienen assets, queda null: no se carga ningún mosaico ni poemas y se
+// muestra la pestaña "Estaciones" (página en blanco con fotos, la de
+// entrada; ver "BARRA DE ESTACIONES" y .vista-estaciones en style.css).
 const CURRENT_SEASON = (function () {
   const pedida = new URLSearchParams(location.search).get('estacion');
-  return (pedida && ESTACIONES[pedida]) ? pedida : ESTACION_POR_DEFECTO;
+  return (pedida && ESTACIONES[pedida]) ? pedida : null;
 })();
+
+// Config de la estación actual. Si todavía no se eligió, un molde vacío
+// para que lo de abajo no explote; igual no se usa, porque la carga de
+// fotos y poemas se saltea cuando CURRENT_SEASON es null.
+const SEASON_CFG = ESTACIONES[CURRENT_SEASON] ||
+                   { fotos: [], texturas: [], orden: SORT_MODE };
 
 // Sentido del degradado por brillo para la estación actual. Otoño va
 // claro → oscuro (como siempre); invierno, oscuro → claro.
-const SEASON_SORT_MODE = ESTACIONES[CURRENT_SEASON].orden || SORT_MODE;
+const SEASON_SORT_MODE = SEASON_CFG.orden || SORT_MODE;
 
 // Marca la estación en el <body> para que el CSS pueda cambiar cosas por
 // estación (por ahora, el color del velo; ver body[data-estacion] en
-// style.css).
-document.body.dataset.estacion = CURRENT_SEASON;
+// style.css). Sin estación elegida no se marca nada (no hay velo).
+if (CURRENT_SEASON) document.body.dataset.estacion = CURRENT_SEASON;
+
+// Sin ?estacion=... se muestra la pestaña "Estaciones": una página
+// aparte, en blanco, con fotos (index.html, #estacionesHome), y se
+// oculta el mosaico. Con una estación elegida es al revés. Ver
+// .vista-estaciones en style.css.
+document.body.classList.toggle('vista-estaciones', !CURRENT_SEASON);
 
 // ---------------------------------------------------------------------
 // Carga automática de fondo: en "modo fondo de home" el panel de
@@ -763,7 +778,7 @@ document.body.dataset.estacion = CURRENT_SEASON;
 // que alguien arrastre fotos, cargamos directamente las fotos de la
 // estación actual y armamos el mosaico apenas terminan de cargar.
 // ---------------------------------------------------------------------
-const ASSET_IMAGE_PATHS = ESTACIONES[CURRENT_SEASON].fotos;
+const ASSET_IMAGE_PATHS = SEASON_CFG.fotos;
 
 // Las fotos originales son de varios MB y miles de píxeles de lado.
 // Decodificarlas todas juntas y a resolución completa es lo que más hace
@@ -836,7 +851,9 @@ function loadAssetBackground() {
   for (let i = 0; i < enParalelo; i++) arrancarUna();
 }
 
-loadAssetBackground();
+// Sin estación elegida no hay mosaico: la web queda en la pantalla
+// "Estaciones" hasta que se elige otoño o invierno.
+if (CURRENT_SEASON) loadAssetBackground();
 
 // ---------------------------------------------------------------------
 // Lectura de poemas: carga los poemas de la estación actual desde su
@@ -1272,7 +1289,7 @@ function loadSeasonPoem(season) {
     .catch(err => console.error('No se pudieron cargar los poemas:', err));
 }
 
-loadSeasonPoem(CURRENT_SEASON);
+if (CURRENT_SEASON) loadSeasonPoem(CURRENT_SEASON);
 
 // =====================================================================
 // EFECTO TEXTURAS (opcional)
@@ -1348,8 +1365,15 @@ const EFECTO_TEXTURAS = true;
 const TEXTURAS_MODO = 'scroll'; // 'scroll' | 'constante'
 const TEXTURAS_CANTIDAD = 14;
 const TEXTURAS_SCROLL_TRAMO = 4;
-const TEXTURAS_IMAGE_PATHS = ESTACIONES[CURRENT_SEASON].texturas;
+const TEXTURAS_IMAGE_PATHS = SEASON_CFG.texturas;
 const TEXTURAS_CICLO_MS = 24000;
+
+// Ajuste fino vertical de TODAS las texturas, en píxeles. 0 = sobre la
+// línea de la grilla del mosaico. Negativo = suben; positivo = bajan.
+// Quedaban sistemáticamente un poquito por debajo de los recortes, así
+// que se las sube unos px. Si todavía no calzan, movés este número:
+// más negativo = más arriba; hacia 0 = más abajo.
+const TEXTURAS_AJUSTE_PX = -1.35;
 
 const texturaCapa = document.getElementById('texturaCapa');
 
@@ -1401,28 +1425,28 @@ function construirTexturas() {
   const VEL_MIN = 0.55, VEL_SPAN = 1.2;   // vel en [0.55, 1.75]
   const VEL_DIF_MIN = 0.45;               // separación mínima con una vecina
 
-  // Grilla del mosaico en pantalla: 13 columnas que ocupan todo el ancho
-  // visible, y filas (recortes) de media columna de alto (tileW 120 :
-  // tileH 60). Medimos la columna real contra el ANCHO DEL CANVAS (sin
-  // barra de scroll) y fijamos ese valor como --col en la capa, así todo
-  // lo que se dibuja con calc(var(--col) ...) —ancho, alto y top de cada
-  // textura— cae exacto sobre la grilla. El alto real del canvas dice
-  // cuántas filas entran.
-  const anchoVisible = document.documentElement.clientWidth || window.innerWidth;
-  const colPx = anchoVisible / 13;
-  const filaPx = colPx / 2;
+  // Geometría REAL del mosaico en pantalla, medida del propio <canvas> (no
+  // se supone ni el nº de columnas ni el ancho del viewport). `rs` = qué
+  // tanto se agranda/achica el canvas al mostrarse (px de pantalla por px
+  // de canvas); de ahí, el ancho de una columna y el alto de una fila
+  // (recorte) EXACTOS. Con tileW 120 : tileH 60, la fila es media columna.
+  const layout = currentLayout || { tileW: 120, tileH: 60 };
+  const canvasRect = canvasEl.getBoundingClientRect();
+  const rs = canvasRect.width / (canvasEl.width || canvasRect.width || 1);
+  const colPx = layout.tileW * rs;
+  const filaPx = layout.tileH * rs;
   texturaCapa.style.setProperty('--col', colPx + 'px');
 
-  // Alinear la capa con el canvas. La capa es inset:0 sobre .contenido y
-  // el <canvas> del mosaico puede arrancar unos píxeles más abajo dentro
-  // de ese bloque; sin corregirlo, todas las texturas quedan ese mismo
-  // tanto por debajo de las líneas de la grilla ("parten un poco más
-  // abajo"). Medimos la diferencia real y la absorbemos moviendo la capa.
-  const desfase = canvasEl.getBoundingClientRect().top -
-                  texturaCapa.getBoundingClientRect().top;
-  texturaCapa.style.top = (desfase > 0 ? desfase : 0) + 'px';
+  // Dónde arranca el mosaico DENTRO de la capa. Normalmente 0 (las dos son
+  // inset:0 sobre .contenido), pero si por layout el <canvas> quedara unos
+  // px más abajo, esta medición lo compensa exacto. Más el ajuste fino
+  // manual (TEXTURAS_AJUSTE_PX). El `top` de cada textura se calcula en px
+  // a partir de acá, no con calc(var(--col) ...), para que caiga sobre la
+  // línea de la grilla pase lo que pase con el layout.
+  const capaRect = texturaCapa.getBoundingClientRect();
+  const offsetY = (canvasRect.top - capaRect.top) + TEXTURAS_AJUSTE_PX;
 
-  const pageH = canvasEl.getBoundingClientRect().height ||
+  const pageH = canvasRect.height ||
                 texturaCapa.offsetHeight ||
                 document.documentElement.scrollHeight || 1;
   const filasTotal = Math.max(6, Math.floor(pageH / filaPx));
@@ -1507,10 +1531,9 @@ function construirTexturas() {
       a = k * filaPx + (enMedio ? filaPx / 2 : 0);
       b = a + hPx;
     } while (!solapeOK(a, b) && ++intento < 40);
-    // top exacto sobre la grilla, en unidades de --col (aguanta el
-    // reescalado: la grilla y este calc() escalan los dos con --col).
-    const uCol = k / 2 + (enMedio ? 0.25 : 0);
-    fig.style.top = 'calc(var(--col) * ' + uCol + ')';
+    // top en px, medido desde donde arranca el mosaico (offsetY) + k
+    // filas reales. Cae sobre la línea k de la grilla del recorte.
+    fig.style.top = (offsetY + k * filaPx).toFixed(2) + 'px';
 
     // velocidad: al azar, pero separada de la de sus vecinas verticales.
     const cerca = vecinas(a, b);
@@ -1698,49 +1721,47 @@ function renderFlowMosaic(tiles, rowHeight, minWidth, maxWidth, onDone) {
 // BARRA DE ESTACIONES
 // ---------------------------------------------------------------------
 // La barra de arriba (index.html, <nav class="topbar">) tiene 5 botones:
-// "Estaciones" + las 4 estaciones. La estación que se ve la define
-// CURRENT_SEASON, que sale del parámetro ?estacion=... de la URL (ver el
-// mapa ESTACIONES más arriba). Al tocar el botón de una estación con
-// assets (Otoño o Invierno) se pone ese parámetro y se recarga la
-// página, así todo —mosaico, poemas y texturas— se arma de cero con las
-// fotos y el YAML de esa estación. Primavera y Verano todavía no tienen
-// assets, así que sus botones no hacen nada.
+// "Estaciones" + las 4 estaciones, y se muestra SIEMPRE, en todas las
+// vistas.
 //
-// "Estaciones" abre una intro (index.html, #introOverlay) donde va la
-// explicación de los poemas.
+//   - "Estaciones" es la pestaña de entrada: sin ?estacion=... en la URL
+//     se ve #estacionesHome (página en blanco con fotos, sin mosaico).
+//     Es lo primero al abrir la web.
+//   - "Otoño" / "Invierno" ponen ?estacion=... y recargan: se arma de
+//     cero el mosaico + los poemas + las texturas de esa estación (desde
+//     ESTACIONES y assets/poemas/<estacion>.yaml).
+//   - "Primavera" / "Verano" todavía no tienen assets: no hacen nada.
+//
+// Cada botón navega cambiando la URL; el estado vive en el parámetro, no
+// en memoria.
 // =====================================================================
 (function () {
   const barra = document.getElementById('topbar');
   if (!barra) return;
 
-  // Marca visualmente la estación que se está viendo (CURRENT_SEASON).
-  const btnActual = barra.querySelector('[data-season="' + CURRENT_SEASON + '"]');
+  // Marca visualmente la pestaña activa: la estación, o "Estaciones"
+  // (data-accion="intro") cuando no hay ninguna elegida.
+  const selActivo = CURRENT_SEASON
+    ? '[data-season="' + CURRENT_SEASON + '"]'
+    : '[data-accion="intro"]';
+  const btnActual = barra.querySelector(selActivo);
   if (btnActual) btnActual.classList.add('is-active');
 
-  const overlay = document.getElementById('introOverlay');
-  const btnCerrar = document.getElementById('introCerrar');
-  const abrirIntro = () => { if (overlay) overlay.hidden = false; };
-  const cerrarIntro = () => { if (overlay) overlay.hidden = true; };
+  // Navega a una vista: pone (o saca, para "Estaciones") ?estacion=... y
+  // recarga. Ignora las estaciones sin assets (primavera, verano) y la
+  // vista que ya se está mostrando.
+  function irA(season) {
+    if (season && (!ESTACIONES[season] || season === CURRENT_SEASON)) return;
+    if (!season && !CURRENT_SEASON) return; // ya en "Estaciones"
+    const url = new URL(location.href);
+    if (season) url.searchParams.set('estacion', season);
+    else url.searchParams.delete('estacion');
+    location.assign(url);
+  }
 
   barra.querySelectorAll('.topbar-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      if (btn.dataset.accion === 'intro') { abrirIntro(); return; }
-      const season = btn.dataset.season;
-      // Estación sin assets propios (Primavera, Verano): no hace nada.
-      if (!season || !ESTACIONES[season] || season === CURRENT_SEASON) return;
-      // Cambiar de estación = recargar con ?estacion=... : el mosaico, los
-      // poemas y las texturas se rearman de cero al volver a cargar.
-      const url = new URL(location.href);
-      url.searchParams.set('estacion', season);
-      location.assign(url);
+      irA(btn.dataset.accion === 'intro' ? null : btn.dataset.season);
     });
-  });
-
-  if (btnCerrar) btnCerrar.addEventListener('click', cerrarIntro);
-  if (overlay) {
-    overlay.addEventListener('click', e => { if (e.target === overlay) cerrarIntro(); });
-  }
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && overlay && !overlay.hidden) cerrarIntro();
   });
 })();

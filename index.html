@@ -5,7 +5,7 @@
 <title>Mosaico por color</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=26">
 <script>
   // La página tiene que abrir siempre desde arriba del todo. Si el
   // navegador restaura la posición de scroll de una visita anterior (o
@@ -17,12 +17,12 @@
 </script>
 </head>
 <body>
-<!-- Barra superior: 5 botones rectangulares, fija arriba. Otoño e
-     Invierno cambian de estación (ponen ?estacion=... en la URL y
-     recargan); sin parámetro se ve la de por defecto. Primavera y Verano
-     todavía no tienen fotos ni poemas propios, así que sus botones no
-     hacen nada. "Estaciones" abre la intro. La lógica está en script.js,
-     bloque "BARRA DE ESTACIONES". -->
+<!-- Barra superior: 5 botones rectangulares, fija arriba, visible en
+     todas las vistas. "Estaciones" es la pestaña de entrada (página en
+     blanco con fotos, #estacionesHome). Otoño e Invierno ponen
+     ?estacion=... en la URL y recargan con su mosaico + poemas. Primavera
+     y Verano todavía no tienen assets, así que sus botones no hacen nada.
+     La lógica está en script.js, bloque "BARRA DE ESTACIONES". -->
 <nav class="topbar" id="topbar">
   <button class="topbar-btn" type="button" data-accion="intro">Estaciones</button>
   <button class="topbar-btn" type="button" data-season="otono">Otoño</button>
@@ -121,18 +121,18 @@
 </div>
 </div>
 
-<!-- Intro del botón "Estaciones": acá va la explicación de los poemas.
-     Arranca oculto; script.js (bloque "BARRA DE ESTACIONES") lo abre y
-     cierra. Editá el texto de <p> con la explicación real. -->
-<div class="intro-overlay" id="introOverlay" hidden>
-  <div class="intro-panel" role="dialog" aria-modal="true" aria-labelledby="introTitulo">
-    <button class="intro-cerrar" id="introCerrar" type="button" aria-label="Cerrar">&times;</button>
-    <h2 id="introTitulo">Estaciones</h2>
-    <p>Acá irá la explicación de mis poemas.</p>
-  </div>
-</div>
+<!-- Pestaña "Estaciones": lo primero que se ve al entrar a la web (sin
+     ?estacion=... en la URL). Página aparte, en blanco, solo con fotos:
+     sin mosaico ni poemas. Para sumar fotos, agregá una línea <img> por
+     cada una, apuntando a un archivo de assets/imagenes/. Las de ahora
+     son de ejemplo. La barra de arriba se muestra siempre. -->
+<section class="estaciones-home" id="estacionesHome">
+  <img src="assets/imagenes/textura-otono-02.jpeg" alt="" loading="lazy">
+  <img src="assets/imagenes/textura-invierno-01.jpg" alt="" loading="lazy">
+  <img src="assets/imagenes/textura-otono-06.jpeg" alt="" loading="lazy">
+</section>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
-<script src="script.js?v=5"></script>
+<script src="script.js?v=26"></script>
 </body>
 </html>

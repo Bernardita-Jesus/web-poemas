@@ -33,6 +33,32 @@ html, body {
   overflow-anchor: none;
 }
 
+/* ---------------------------------------------------------------------
+   Barra de scroll: mínima y casi invisible, en un morado clarito
+   translúcido (tinte claro del morado del botón "Estaciones", #6f6480).
+   El carril queda transparente; solo se ve el hilito del pulgar, que se
+   marca un poco más al pasar el mouse por la página. Firefox usa
+   scrollbar-width/-color; el resto, ::-webkit-scrollbar.
+--------------------------------------------------------------------- */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(164, 152, 194, .30) transparent;
+}
+html:hover { scrollbar-color: rgba(164, 152, 194, .55) transparent; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  /* el borde transparente + background-clip achica el pulgar visible a
+     ~4px dentro de un carril de 10px */
+  background-color: rgba(164, 152, 194, .28);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+  transition: background-color .2s ease;
+}
+::-webkit-scrollbar-thumb:hover { background-color: rgba(164, 152, 194, .6); }
+
 .wrap {
   display: grid;
   grid-template-columns: 340px 1fr;
@@ -400,9 +426,9 @@ body[data-estacion="otono"]::after {
     rgba(206, 242, 230, .25) 100%
   );
 }
-/* Invierno: velo celeste plano al 15% (sin degradado, por ahora). */
+/* Invierno: velo celeste plano al 20% (sin degradado, por ahora). */
 body[data-estacion="invierno"]::after {
-  background: rgba(200, 223, 245, .15);
+  background: rgba(200, 223, 245, .20);
 }
 
 /* ---------------------------------------------------------------------
@@ -546,60 +572,29 @@ body[data-estacion="invierno"]::after {
 }
 
 /* ---------------------------------------------------------------------
-   Intro del botón "Estaciones": una ventana centrada, por encima de
-   todo, con la explicación de los poemas. Arranca oculta (atributo
-   hidden); script.js la muestra/oculta. Cerrar: la X, un clic afuera o
-   la tecla Esc.
+   Pestaña "Estaciones": la pantalla de entrada, la que se ve al abrir la
+   web sin ?estacion=... en la URL. Es una página aparte, en blanco, solo
+   con fotos: sin mosaico ni poemas. La barra de arriba sigue visible y
+   con todos los botones activos.
+
+   script.js pone la clase .vista-estaciones en el <body> cuando no hay
+   estación elegida: ahí se muestra .estaciones-home y se oculta .wrap
+   (el mosaico). Con una estación elegida es al revés.
 --------------------------------------------------------------------- */
-.intro-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
+.estaciones-home { display: none; }
+.vista-estaciones .wrap { display: none; }
+.vista-estaciones .estaciones-home {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(20, 16, 6, .55);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
+  gap: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 20px 80px;
 }
-/* display: flex de arriba le gana al hidden del navegador; hay que
-   reponerlo para que 'hidden' realmente lo oculte. */
-.intro-overlay[hidden] { display: none; }
-.intro-panel {
-  position: relative;
+.estaciones-home img {
+  display: block;
   width: 100%;
-  max-width: 560px;
-  background: var(--panel);
-  border: 1px solid var(--panel-line);
-  border-radius: 6px;
-  padding: 40px 36px;
-  box-shadow: 0 30px 60px -25px rgba(150, 125, 40, .5);
+  height: auto;
 }
-.intro-panel h2 {
-  font-family: 'Source Serif 4', serif;
-  font-weight: 600;
-  font-size: 26px;
-  margin: 0 0 14px 0;
-  color: var(--text);
-}
-.intro-panel p {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.6;
-  color: var(--text-dim);
-}
-.intro-cerrar {
-  position: absolute;
-  top: 8px;
-  right: 10px;
-  border: 0;
-  background: transparent;
-  font-size: 22px;
-  line-height: 1;
-  padding: 6px 8px;
-  color: var(--text-dim);
-  cursor: pointer;
-}
-.intro-cerrar:hover { color: var(--text); }
 
