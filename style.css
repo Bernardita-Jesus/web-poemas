@@ -53,30 +53,44 @@ body {
 .vista-estaciones .scroll-area { overflow: hidden; }   /* estaciones: sin scroll */
 
 /* ---------------------------------------------------------------------
-   Barra de scroll de .scroll-area (la única que scrollea). Se ve:
-     - el fondo de la barra (track), morado muy clarito;
-     - el pulgar, un rectángulo redondeado morado.
-   SIN flechitas: en Chrome (Windows) los contenedores internos con
-   overflow traen flechas por defecto, así que se ocultan con
-   ::-webkit-scrollbar-button { display: none }.
-   Firefox no tiene flechitas nunca; usa scrollbar-width/-color.
+   Barra de scroll: la NATIVA de .scroll-area va oculta (Chrome en Windows
+   le pone flechitas en los contenedores internos y no hay CSS que las
+   saque). En su lugar se dibuja una propia: #cscroll (carril + pulgar),
+   fija a la derecha, arrancando debajo de la barra de botones. La mueve
+   script.js (bloque "BARRA DE SCROLL PROPIA"): se puede arrastrar el
+   pulgar o clickear el carril, y el scroll con rueda/trackpad sigue igual.
 --------------------------------------------------------------------- */
-.scroll-area {
-  scrollbar-width: thin;
-  scrollbar-color: #b3a9d0 #ece8f4;        /* Firefox: pulgar, fondo */
+.scroll-area { scrollbar-width: none; }                 /* Firefox */
+.scroll-area::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+.cscroll {
+  position: fixed;
+  top: var(--barra-alto);        /* arranca justo debajo de los botones */
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  z-index: 15;                    /* sobre el contenido, debajo de la barra (20) */
+  /* tonos neutros de la paleta: el carril, un poco más oscuro que el
+     fondo de "Estaciones" (#fefcf4) */
+  background: #f1e9d2;            /* fondo de la barra */
 }
-/* Custom scrollbar mínima: track + pulgar, nada más. Un ::-webkit-scrollbar
-   así NO trae flechitas en Chrome (los botones solo aparecen si se estila
-   ::-webkit-scrollbar-button, cosa que acá NO se hace). */
-.scroll-area::-webkit-scrollbar { width: 12px; }
-.scroll-area::-webkit-scrollbar-track { background: #ece8f4; }
-.scroll-area::-webkit-scrollbar-thumb {
-  background: #b3a9d0;
-  border: 3px solid #ece8f4;               /* separa el pulgar del borde del track */
+.cscroll-thumb {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 12px;
+  min-height: 24px;
+  border: 3px solid #f1e9d2;      /* separa el pulgar del borde del carril */
+  background: #d7c9a3;            /* el rectángulo redondeado */
   background-clip: padding-box;
   border-radius: 20px;
+  cursor: grab;
+  transition: background-color .15s ease;
 }
-.scroll-area::-webkit-scrollbar-thumb:hover { background: #9f93c2; }
+.cscroll-thumb:hover { background: #c8b98d; }
+.cscroll-thumb.drag { background: #c8b98d; cursor: grabbing; }
+/* en "Estaciones" no hay scroll: la barra propia no se muestra */
+.vista-estaciones .cscroll { display: none; }
 
 .wrap {
   display: grid;

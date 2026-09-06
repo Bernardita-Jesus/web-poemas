@@ -1775,3 +1775,85 @@ function renderFlowMosaic(tiles, rowHeight, minWidth, maxWidth, onDone) {
     });
   });
 })();
+
+// =====================================================================
+// BARRA DE SCROLL PROPIA
+// ---------------------------------------------------------------------
+// Chrome (Windows) le dibuja flechitas a la barra de scroll de los
+// contenedores internos (.scroll-area) y no hay CSS que las saque. Así
+// que ocultamos la barra nativa (ver style.css) y dibujamos la nuestra:
+// un carril fijo pegado a la derecha, que arranca justo debajo de la
+// barra de botones, con un pulgar redondeado. Sin flechitas, y se puede
+// arrastrar o clickear el carril para saltar.
+// =====================================================================
+(function () {
+  const area = document.querySelector('.scroll-area');
+  const bar = document.getElementById('cscroll');
+  const thumb = document.getElementById('cscrollThumb');
+  if (!area || !bar || !thumb) return;
+
+  const leerTop = () => parseFloat((thumb.style.transform.match(/-?[\d.]+/) || [0])[0]) || 0;
+
+  // Ajusta alto y posición del pulgar según cuánto se scrolleó.
+  function sync() {
+    const vis = area.clientHeight;
+    const total = area.scrollHeight;
+    if (total <= vis + 1) { bar.hidden = true; return; }  // no hay nada que scrollear
+    bar.hidden = false;
+    const track = bar.clientHeight;
+    const h = Math.max(24, Math.round(track * vis / total));
+    const maxTop = Math.max(0, track - h);
+    const top = maxTop * (area.scrollTop / (total - vis));
+    thumb.style.height = h + 'px';
+    thumb.style.transform = 'translateY(' + top + 'px)';
+  }
+
+  let raf = 0;
+  function onScroll() {
+    if (raf) return;
+    raf = requestAnimationFrame(() => { raf = 0; sync(); });
+  }
+  area.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', sync);
+  // el mosaico cambia mucho el alto al dibujarse: re-medimos un rato.
+  const remedir = setInterval(sync, 250);
+  setTimeout(() => clearInterval(remedir), 12000);
+  window.addEventListener('load', sync);
+
+  // Llevar el scroll a la posición que corresponde a un `top` de pulgar.
+  function scrollAtop(top) {
+    const track = bar.clientHeight;
+    const maxTop = Math.max(1, track - thumb.offsetHeight);
+    const t = Math.max(0, Math.min(maxTop, top));
+    area.scrollTop = (t / maxTop) * (area.scrollHeight - area.clientHeight);
+  }
+
+  // Arrastre del pulgar.
+  let dragY = 0, dragTop = 0;
+  thumb.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    try { thumb.setPointerCapture(e.pointerId); } catch (_) {}
+    thumb.classList.add('drag');
+    dragY = e.clientY;
+    dragTop = leerTop();
+  });
+  thumb.addEventListener('pointermove', (e) => {
+    if (!thumb.classList.contains('drag')) return;
+    scrollAtop(dragTop + (e.clientY - dragY));
+  });
+  const finDrag = (e) => {
+    thumb.classList.remove('drag');
+    try { thumb.releasePointerCapture(e.pointerId); } catch (_) {}
+  };
+  thumb.addEventListener('pointerup', finDrag);
+  thumb.addEventListener('pointercancel', finDrag);
+
+  // Clic en el carril (fuera del pulgar): saltar ahí.
+  bar.addEventListener('pointerdown', (e) => {
+    if (e.target === thumb) return;
+    const rect = bar.getBoundingClientRect();
+    scrollAtop((e.clientY - rect.top) - thumb.offsetHeight / 2);
+  });
+
+  sync();
+})();
