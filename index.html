@@ -17,11 +17,12 @@
 </script>
 </head>
 <body>
-<!-- Barra superior: 5 botones rectangulares, fija arriba. Por ahora solo
-     "Otoño" está activo (es lo que se ve al abrir). Invierno, Primavera
-     y Verano todavía no tienen fotos ni poemas propios, así que sus
-     botones no hacen nada. "Estaciones" abre la intro. La lógica está
-     en script.js, bloque "BARRA DE ESTACIONES". -->
+<!-- Barra superior: 5 botones rectangulares, fija arriba. Otoño e
+     Invierno cambian de estación (ponen ?estacion=... en la URL y
+     recargan); sin parámetro se ve la de por defecto. Primavera y Verano
+     todavía no tienen fotos ni poemas propios, así que sus botones no
+     hacen nada. "Estaciones" abre la intro. La lógica está en script.js,
+     bloque "BARRA DE ESTACIONES". -->
 <nav class="topbar" id="topbar">
   <button class="topbar-btn" type="button" data-accion="intro">Estaciones</button>
   <button class="topbar-btn" type="button" data-season="otono">Otoño</button>

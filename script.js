@@ -40,10 +40,16 @@ const sortMode = document.getElementById('sortMode');
 const jitterSlider = document.getElementById('jitter');
 const jitterVal = document.getElementById('jitterVal');
 
-// Único ordenamiento del mosaico: por brillo, de claro a oscuro, con una
-// pizca de aleatoriedad para que las bandas no queden perfectamente lisas.
+// Ordenamiento del mosaico: siempre por brillo, con una pizca de
+// aleatoriedad (SORT_JITTER) para que las bandas no queden lisas. El
+// SENTIDO lo elige cada estación en el mapa ESTACIONES (campo `orden`):
+//   'brightness'      -> claro → oscuro (arranca claro arriba)
+//   'brightness-dark' -> oscuro → claro (arranca oscuro arriba)
+// SORT_MODE es solo el valor por defecto para una estación que no defina
+// `orden`. El que se usa de verdad es SEASON_SORT_MODE (más abajo, junto
+// a CURRENT_SEASON).
 const SORT_MODE = 'brightness';
-const SORT_JITTER = 0.15;
+const SORT_JITTER = 0.30;
 
 // =====================================================================
 // EFECTO MOSAICO (opcional)
@@ -83,24 +89,26 @@ const SORT_JITTER = 0.15;
 //                               (más alto = cambios más espaciados)
 //   MOSAICO_DESLIZ_MS         - cuánto tarda un cuadrado en deslizarse
 //                               hasta el recorte de al lado (modo 'desliz')
+//   MOSAICO_MAX_ACTIVAS       - tope duro de cuadrados moviéndose a la vez
+//                               (freno de rendimiento; ver más abajo)
 //
 // PORCENTAJE vs. CUADRADOS MOVIÉNDOSE A LA VEZ (modo 'desliz'):
 //   El porcentaje es cuántos EMPIEZAN a deslizarse por ciclo, no cuántos
 //   se ven en movimiento en un instante. Como cada deslizamiento (17,5 s)
 //   dura más que el ciclo (5 s), se van solapando y acumulando. La
-//   cantidad que hay moviéndose a la vez, en régimen, es:
+//   cantidad que TENDERÍA a haber moviéndose a la vez es:
 //
 //       PORCENTAJE * (MOSAICO_DESLIZ_MS / MOSAICO_CAMBIO_INTERVALO)
 //       = 5% * (17500 / 5000) = 5% * 3,5 = 17,5% del mosaico
 //
-//   Sobre ~780 cuadrados son ~135 deslizándose simultáneamente (un poco
-//   menos por los que se saltean si les toca uno que ya está en marcha).
-//   El arranque "en caliente" larga de una esa misma tanda de ~135, así
-//   ese 17,5% ya está presente desde el primer momento en vez de tardar
-//   17,5 s en acumularse.
+//   ...pero MOSAICO_MAX_ACTIVAS lo corta ahí: sobre un mosaico grande ese
+//   17,5% eran cientos de cuadrados, cada uno con su animación, y la
+//   página se pegaba. Ahora, pasado el tope, los pedidos nuevos se
+//   ignoran hasta que alguno termina, y un único requestAnimationFrame
+//   anima a todos los activos juntos.
 //
-//   Para que se vean MENOS en movimiento a la vez: bajá PORCENTAJE.
-//   Para que cambien más seguido: bajá INTERVALO.
+//   Para que se vean MENOS en movimiento a la vez: bajá MAX_ACTIVAS (o
+//   PORCENTAJE). Para que cambien más seguido: bajá INTERVALO.
 // =====================================================================
 const EFECTO_MOSAICO = true;
 const MOSAICO_MODO = 'desliz'; // 'desliz' | 'intercambio'
@@ -111,6 +119,14 @@ const MOSAICO_DESLIZ_MS = 17500;
 // El ciclo se reparte en pasos chiquitos de este tamaño para que los
 // cambios se sientan graduales y no como un parpadeo de golpe.
 const MOSAICO_PASO_MS = 260;
+
+// Tope de cuadrados deslizándose a la vez. El reloj interno puede pedir
+// más (según PORCENTAJE), pero por encima de este número los pedidos se
+// ignoran hasta que alguno termina. Es el freno principal contra el "se
+// pega": cada cuadrado en movimiento es un blit de canvas por frame, y
+// dejar que se acumulen cientos trababa la página. Un único
+// requestAnimationFrame los anima a todos (ver startMosaicDrift).
+const MOSAICO_MAX_ACTIVAS = 64;
 
 // Estado del efecto en curso (o null si está apagado / sin arrancar).
 let mosaicoDrift = null;
@@ -367,7 +383,7 @@ function buildMosaic() {
   }
 
   function sortAndRender() {
-    applySort(tiles, SORT_MODE, SORT_JITTER);
+    applySort(tiles, SEASON_SORT_MODE, SORT_JITTER);
 
     currentTiles = tiles;
     currentLayout = { variable, tileW, tileH, rowHeight, minWidth, maxWidth };
@@ -404,7 +420,8 @@ function applySort(tilesArr, mode, jitterAmount) {
   tilesArr.forEach(t => {
     let key;
     if (mode === 'hue') key = t.h_; // 0..360
-    else if (mode === 'brightness') key = (1 - t.bri) * 360; // flip so low = bright, scale to 360
+    else if (mode === 'brightness') key = (1 - t.bri) * 360; // flip so low = bright, scale to 360 (claro → oscuro)
+    else if (mode === 'brightness-dark') key = t.bri * 360; // low = dark, scale to 360 (oscuro → claro)
     else if (mode === 'saturation') key = (1 - t.s) * 360;
     else key = t.h_ + t.bri * 40; // hue-bright, small brightness nudge
 
@@ -458,8 +475,8 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
       const row = Math.floor(i / cols);
       // Para las celdas sobrantes de la última fila (i >= n) reflejamos hacia
       // atrás desde el final del array en vez de volver al principio: así el
-      // relleno usa los recortes más oscuros, que es donde termina el degradado,
-      // y no los más claros del arranque.
+      // relleno sigue con los recortes del mismo extremo del degradado que la
+      // última fila dibujada, y no con los del arranque (el otro extremo).
       let idx = i;
       if (idx >= n) idx = Math.max(0, 2 * n - 1 - idx);
       ctx.putImageData(tiles[idx].imgData, col * tileW, row * tileH);
@@ -506,9 +523,58 @@ function startMosaicDrift(ctx, tiles, n, tileW, tileH, cols, total) {
                   (MOSAICO_PASO_MS / MOSAICO_CAMBIO_INTERVALO);
   let acum = 0;
 
-  const state = { ctx, tileW, tileH, cols, total, cellPan, seedTimers: [] };
-  const paso = MOSAICO_MODO === 'desliz' ? deslizarEnLaFoto : intercambiarConVecino;
+  // activas: los deslizamientos en curso. Un ÚNICO requestAnimationFrame
+  // (state.raf) los adelanta a todos en cada frame; antes había un rAF por
+  // cuadrado y se juntaban cientos, que es lo que trababa la página.
+  // seedTimers: los timers del arranque en caliente.
+  const state = { ctx, tileW, tileH, cols, total, cellPan,
+                  activas: [], raf: 0, seedTimers: [] };
+  const paso = MOSAICO_MODO === 'desliz' ? iniciarDesliz : intercambiarConVecino;
+
+  // Bucle compartido: recorre las activas, adelanta cada una y saca las
+  // que llegaron al final. Se vuelve a pedir solo mientras quede alguna.
+  state.loop = (ahora) => {
+    const activas = state.activas;
+    for (let i = activas.length - 1; i >= 0; i--) {
+      const a = activas[i];
+      const t = Math.min(1, (ahora - a.inicio) / MOSAICO_DESLIZ_MS);
+      // Mezcla mitad lineal, mitad suavizado en las puntas: se mueve
+      // parejo pero sin que se note el salto al arrancar y frenar.
+      const easeInOut = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+      const e = 0.5 * t + 0.5 * easeInOut;
+      const sX = a.fromX + (a.toX - a.fromX) * e;
+      const sY = a.fromY + (a.toY - a.fromY) * e;
+      state.ctx.drawImage(a.src, sX, sY, state.tileW, state.tileH,
+                          a.cellX, a.cellY, state.tileW, state.tileH);
+      if (t >= 1) {
+        a.pan.srcX = a.toX;
+        a.pan.srcY = a.toY;
+        a.pan.moviendo = false;
+        activas.splice(i, 1);
+      }
+    }
+    state.raf = activas.length ? requestAnimationFrame(state.loop) : 0;
+  };
+  state.arrancarLoop = () => {
+    if (!state.raf && !document.hidden && state.activas.length) {
+      state.raf = requestAnimationFrame(state.loop);
+    }
+  };
+
+  // Pausa al cambiar de pestaña: con la pestaña oculta el navegador
+  // congela los rAF; sin esto el setInterval seguiría sumando
+  // deslizamientos y, al volver, llegaría todo junto y se trabaría.
+  state.onVisibilidad = () => {
+    if (document.hidden) {
+      if (state.raf) { cancelAnimationFrame(state.raf); state.raf = 0; }
+    } else {
+      state.arrancarLoop();
+    }
+  };
+  document.addEventListener('visibilitychange', state.onVisibilidad);
+
   state.timer = setInterval(() => {
+    if (document.hidden) return;
     acum += porPaso;
     let cuantos = Math.floor(acum);
     acum -= cuantos;
@@ -517,13 +583,15 @@ function startMosaicDrift(ctx, tiles, n, tileW, tileH, cols, total) {
   mosaicoDrift = state;
 
   // Arranque "en caliente" (modo 'desliz'): en vez de esperar a que el
-  // reloj vaya sumando deslizamientos de a poco, largamos ya una tanda del
-  // tamaño que tendría en régimen, con demoras al azar repartidas en la
+  // reloj vaya sumando deslizamientos de a poco, largamos ya una tanda
+  // —topeada por MOSAICO_MAX_ACTIVAS— con demoras al azar repartidas en la
   // duración de un deslizamiento. Así, apenas se dibuja el mosaico, ya hay
   // cuadrados en movimiento y a distintas alturas del recorrido.
   if (MOSAICO_MODO === 'desliz') {
-    const enRegimen = Math.round((total * MOSAICO_CAMBIO_PORCENTAJE / 100) *
-                                 (MOSAICO_DESLIZ_MS / MOSAICO_CAMBIO_INTERVALO));
+    const enRegimen = Math.min(
+      MOSAICO_MAX_ACTIVAS,
+      Math.round((total * MOSAICO_CAMBIO_PORCENTAJE / 100) *
+                 (MOSAICO_DESLIZ_MS / MOSAICO_CAMBIO_INTERVALO)));
     for (let k = 0; k < enRegimen; k++) {
       state.seedTimers.push(setTimeout(() => paso(state), Math.random() * MOSAICO_DESLIZ_MS));
     }
@@ -533,7 +601,11 @@ function startMosaicDrift(ctx, tiles, n, tileW, tileH, cols, total) {
 function stopMosaicDrift() {
   if (mosaicoDrift) {
     if (mosaicoDrift.timer) clearInterval(mosaicoDrift.timer);
+    if (mosaicoDrift.raf) cancelAnimationFrame(mosaicoDrift.raf);
     (mosaicoDrift.seedTimers || []).forEach(clearTimeout);
+    if (mosaicoDrift.onVisibilidad) {
+      document.removeEventListener('visibilitychange', mosaicoDrift.onVisibilidad);
+    }
   }
   mosaicoDrift = null;
 }
@@ -567,14 +639,19 @@ function intercambiarConVecino(state) {
   ctx.putImageData(imgA, bx, by);
 }
 
-// efecto mosaico (modo 'desliz'): elige una celda al azar y desliza
-// despacio su ventana de recorte dentro de la foto original, un cuadrado
-// hacia arriba, abajo, izquierda o derecha, revelando el recorte que en
-// esa foto está pegado al lado. El paneo es acumulativo: la celda queda
-// apuntando al recorte nuevo y la próxima vez sigue desde ahí.
-function deslizarEnLaFoto(state) {
-  const { ctx, tileW, tileH, cols, total, cellPan } = state;
+// efecto mosaico (modo 'desliz'): elige una celda al azar y arma un
+// deslizamiento —despacio, su ventana de recorte se corre un cuadrado
+// hacia la izquierda o la derecha dentro de la foto original, revelando el
+// recorte pegado al lado—. El paneo es acumulativo: la celda queda
+// apuntando al recorte nuevo y la próxima vez sigue desde ahí. El avance
+// cuadro a cuadro lo hace el bucle compartido (state.loop); acá solo se
+// prepara y se mete en state.activas.
+function iniciarDesliz(state) {
+  const { tileW, tileH, cols, total, cellPan } = state;
   if (!cellPan) return;
+  // Tope de simultáneos: por encima se ignora el pedido hasta que alguno
+  // termine (ver MOSAICO_MAX_ACTIVAS).
+  if (state.activas.length >= MOSAICO_MAX_ACTIVAS) return;
 
   const celda = Math.floor(Math.random() * total);
   const pan = cellPan[celda];
@@ -595,75 +672,168 @@ function deslizarEnLaFoto(state) {
   if (dirs.length === 0) return;
   const [dx, dy] = dirs[Math.floor(Math.random() * dirs.length)];
 
-  const cellX = (celda % cols) * tileW;
-  const cellY = Math.floor(celda / cols) * tileH;
-  const fromX = pan.srcX, fromY = pan.srcY;
-  const toX = fromX + dx, toY = fromY + dy;
   pan.moviendo = true;
-  const inicio = performance.now();
-
-  function frame(ahora) {
-    let t = Math.min(1, (ahora - inicio) / MOSAICO_DESLIZ_MS);
-    // Mezcla mitad lineal, mitad suavizado en las puntas: se mueve bastante
-    // parejo pero sin que se note del todo el salto al arrancar y frenar.
-    // Subí el 0.5 del easeInOut para un desliz más gradual; bajalo a 0 para
-    // lineal puro.
-    const easeInOut = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-    const e = 0.5 * t + 0.5 * easeInOut;
-    const sX = fromX + (toX - fromX) * e;
-    const sY = fromY + (toY - fromY) * e;
-    ctx.drawImage(src, sX, sY, tileW, tileH, cellX, cellY, tileW, tileH);
-    if (t < 1) {
-      requestAnimationFrame(frame);
-    } else {
-      pan.srcX = toX;
-      pan.srcY = toY;
-      pan.moviendo = false;
-    }
-  }
-  requestAnimationFrame(frame);
+  state.activas.push({
+    pan, src,
+    fromX: pan.srcX, fromY: pan.srcY,
+    toX: pan.srcX + dx, toY: pan.srcY + dy,
+    cellX: (celda % cols) * tileW,
+    cellY: Math.floor(celda / cols) * tileH,
+    inicio: performance.now(),
+  });
+  state.arrancarLoop();
 }
+
+// ---------------------------------------------------------------------
+// ESTACIONES: qué fotos y qué texturas usa cada una. La estación que se
+// muestra se elige con ?estacion=... en la URL; los botones de la barra
+// de arriba la cambian y recargan la página (ver "BARRA DE ESTACIONES"
+// más abajo). Sin parámetro válido se usa ESTACION_POR_DEFECTO.
+//
+// Los poemas de la estación salen de assets/poemas/<estacion>.yaml.
+// Primavera y Verano todavía no tienen assets, así que sus botones no
+// hacen nada. Si sumás o sacás fotos de assets/imagenes, actualizá la
+// lista correspondiente acá.
+// ---------------------------------------------------------------------
+const ESTACIONES = {
+  otono: {
+    // sentido del degradado por brillo (ver SORT_MODE): claro arriba.
+    orden: 'brightness',
+    fotos: [
+      'assets/imagenes/otono-07.jpg',
+      'assets/imagenes/otono-08.jpg',
+      'assets/imagenes/otono-09.jpg',
+      'assets/imagenes/otono-10.jpeg',
+      'assets/imagenes/otono-11.jpeg',
+      'assets/imagenes/otono-12.jpeg',
+    ],
+    texturas: [
+      'assets/imagenes/textura-otono-01.jpeg',
+      'assets/imagenes/textura-otono-02.jpeg',
+      'assets/imagenes/textura-otono-03.jpeg',
+      'assets/imagenes/textura-otono-04.jpeg',
+      'assets/imagenes/textura-otono-05.jpeg',
+      'assets/imagenes/textura-otono-06.jpeg',
+      'assets/imagenes/textura-otono-07.jpg',
+      'assets/imagenes/textura-otono-08.jpg',
+    ],
+  },
+  invierno: {
+    // sentido del degradado por brillo (ver SORT_MODE): oscuro arriba.
+    orden: 'brightness-dark',
+    fotos: [
+      'assets/imagenes/invierno-01.jpg',
+      'assets/imagenes/invierno-02.jpg',
+      'assets/imagenes/invierno-03.jpg',
+      'assets/imagenes/invierno-04.jpg',
+      'assets/imagenes/invierno-05.jpg',
+      'assets/imagenes/invierno-06.jpg',
+      'assets/imagenes/invierno-07.jpg',
+      'assets/imagenes/invierno-09.jpg',
+      'assets/imagenes/invierno-10.jpg',
+      'assets/imagenes/invierno-11.jpg',
+    ],
+    texturas: [
+      'assets/imagenes/textura-invierno-01.jpg',
+      'assets/imagenes/textura-invierno-02.jpg',
+    ],
+  },
+};
+const ESTACION_POR_DEFECTO = 'invierno';
+
+// Estación pedida por la URL (?estacion=otono). Si no es una de las que
+// tienen assets, se cae a la de por defecto.
+const CURRENT_SEASON = (function () {
+  const pedida = new URLSearchParams(location.search).get('estacion');
+  return (pedida && ESTACIONES[pedida]) ? pedida : ESTACION_POR_DEFECTO;
+})();
+
+// Sentido del degradado por brillo para la estación actual. Otoño va
+// claro → oscuro (como siempre); invierno, oscuro → claro.
+const SEASON_SORT_MODE = ESTACIONES[CURRENT_SEASON].orden || SORT_MODE;
+
+// Marca la estación en el <body> para que el CSS pueda cambiar cosas por
+// estación (por ahora, el color del velo; ver body[data-estacion] en
+// style.css).
+document.body.dataset.estacion = CURRENT_SEASON;
 
 // ---------------------------------------------------------------------
 // Carga automática de fondo: en "modo fondo de home" el panel de
 // controles está oculto (ver style.css), así que en vez de esperar a
-// que alguien arrastre fotos, cargamos directamente las imágenes que
-// están en assets/imagenes y armamos el mosaico apenas terminan de
-// cargar. Si sumás o sacás fotos de esa carpeta, actualizá esta lista.
+// que alguien arrastre fotos, cargamos directamente las fotos de la
+// estación actual y armamos el mosaico apenas terminan de cargar.
 // ---------------------------------------------------------------------
-const ASSET_IMAGE_PATHS = [
-  'assets/imagenes/otono-07.jpg',
-  'assets/imagenes/otono-08.jpg',
-  'assets/imagenes/otono-09.jpg',
-  'assets/imagenes/otono-10.jpeg',
-  'assets/imagenes/otono-11.jpeg',
-  'assets/imagenes/otono-12.jpeg',
-];
+const ASSET_IMAGE_PATHS = ESTACIONES[CURRENT_SEASON].fotos;
+
+// Las fotos originales son de varios MB y miles de píxeles de lado.
+// Decodificarlas todas juntas y a resolución completa es lo que más hace
+// "tardar y pegarse" el arranque, así que:
+//   - se decodifican de a pocas (ASSET_DECODE_CONCURRENCIA);
+//   - se reducen a ASSET_LADO_MAX de lado al decodificar. El mosaico
+//     trabaja a WORK_DIM (960) con un zoom de recorte y el efecto desliz
+//     pasea por la foto, así que 2000 px deja margen de sobra; las
+//     originales de 5000-6000 px solo gastaban memoria.
+const ASSET_DECODE_CONCURRENCIA = 3;
+const ASSET_LADO_MAX = 2000;
+
+// Decodifica una foto ya reducida y fuera del hilo principal con
+// createImageBitmap. Si el navegador no soporta el resize (Safari viejo),
+// devuelve el bitmap a resolución completa; si no hay createImageBitmap,
+// cae al <img> de siempre. Devuelve una promesa con algo dibujable
+// (ImageBitmap o HTMLImageElement), las dos sirven para drawImage.
+function cargarFotoReducida(path) {
+  if (window.createImageBitmap && window.fetch) {
+    return fetch(path)
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+      .then(blob => createImageBitmap(blob))
+      .then(bm => {
+        const escala = Math.min(1, ASSET_LADO_MAX / Math.max(bm.width, bm.height));
+        if (escala === 1) return bm;
+        return createImageBitmap(bm, {
+          resizeWidth: Math.round(bm.width * escala),
+          resizeHeight: Math.round(bm.height * escala),
+          resizeQuality: 'high',
+        }).then(chico => { bm.close(); return chico; })
+          .catch(() => bm); // navegador sin opciones de resize: usar el grande
+      });
+  }
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('no se pudo abrir'));
+    img.src = path;
+  });
+}
 
 function loadAssetBackground() {
   let settled = 0;
-  ASSET_IMAGE_PATHS.forEach(path => {
-    const img = new Image();
-    const onSettle = () => {
-      settled++;
-      updateCount();
-      if (settled === ASSET_IMAGE_PATHS.length && uploadedImages.length > 0) {
-        buildMosaic();
-      }
-    };
-    img.onload = () => {
-      uploadedImages.push(img);
-      const t = document.createElement('img');
-      t.src = path;
-      thumbrow.appendChild(t);
-      onSettle();
-    };
-    img.onerror = () => {
-      console.error('No se pudo cargar la imagen de fondo:', path);
-      onSettle();
-    };
-    img.src = path;
-  });
+  let siguiente = 0;
+
+  const onSettle = () => {
+    settled++;
+    updateCount();
+    if (settled === ASSET_IMAGE_PATHS.length && uploadedImages.length > 0) {
+      buildMosaic();
+    }
+  };
+
+  const arrancarUna = () => {
+    if (siguiente >= ASSET_IMAGE_PATHS.length) return;
+    const path = ASSET_IMAGE_PATHS[siguiente++];
+    cargarFotoReducida(path)
+      .then(bm => {
+        uploadedImages.push(bm);
+        const t = document.createElement('img');
+        t.src = path;
+        t.loading = 'lazy';
+        thumbrow.appendChild(t);
+      })
+      .catch(err => console.error('No se pudo cargar la imagen de fondo:', path, err))
+      .then(() => { onSettle(); arrancarUna(); }); // libera el cupo para la próxima
+  };
+
+  const enParalelo = Math.min(ASSET_DECODE_CONCURRENCIA, ASSET_IMAGE_PATHS.length);
+  for (let i = 0; i < enParalelo; i++) arrancarUna();
 }
 
 loadAssetBackground();
@@ -674,8 +844,9 @@ loadAssetBackground();
 // muestra en una columna, cada uno con su fecha. El mosaico queda fijo
 // de fondo (ver style.css) y cada poema entra con un fundido cuando
 // aparece en pantalla al hacer scroll.
+// La estación activa (CURRENT_SEASON) se resuelve más arriba, junto con
+// el mapa ESTACIONES.
 // ---------------------------------------------------------------------
-const CURRENT_SEASON = 'otono';
 const poemCard = document.getElementById('poemCard');
 
 // =====================================================================
@@ -787,8 +958,11 @@ function markMosaicReady() {
 
 // Red de seguridad: si el mosaico nunca llega a terminar (por ejemplo,
 // si fallan las imágenes de assets/imagenes), igual arrancamos los
-// poemas después de unos segundos para que la página no quede muda.
-setTimeout(markMosaicReady, 8000);
+// poemas después de unos segundos para que la página no quede muda. Se
+// da un margen amplio porque invierno carga más fotos y tarda más; si
+// aun así salta antes de tiempo, construirTexturas reintenta hasta que
+// el canvas existe, así las texturas no quedan desalineadas.
+setTimeout(markMosaicReady, 12000);
 
 // Cuánto esperar después de una letra según qué signo se acaba de tocar:
 // pausa larga en las paradas fuertes (. ! ? … ;), media en las suaves
@@ -1174,16 +1348,7 @@ const EFECTO_TEXTURAS = true;
 const TEXTURAS_MODO = 'scroll'; // 'scroll' | 'constante'
 const TEXTURAS_CANTIDAD = 14;
 const TEXTURAS_SCROLL_TRAMO = 4;
-const TEXTURAS_IMAGE_PATHS = [
-  'assets/imagenes/textura-otono-01.jpeg',
-  'assets/imagenes/textura-otono-02.jpeg',
-  'assets/imagenes/textura-otono-03.jpeg',
-  'assets/imagenes/textura-otono-04.jpeg',
-  'assets/imagenes/textura-otono-05.jpeg',
-  'assets/imagenes/textura-otono-06.jpeg',
-  'assets/imagenes/textura-otono-07.jpg',
-  'assets/imagenes/textura-otono-08.jpg',
-];
+const TEXTURAS_IMAGE_PATHS = ESTACIONES[CURRENT_SEASON].texturas;
 const TEXTURAS_CICLO_MS = 24000;
 
 const texturaCapa = document.getElementById('texturaCapa');
@@ -1200,6 +1365,17 @@ function barajar(a) {
 function construirTexturas() {
   if (!EFECTO_TEXTURAS || !texturaCapa || TEXTURAS_IMAGE_PATHS.length === 0) return;
   if (texturaCapa.children.length) return; // ya armada: no duplicar
+
+  // La capa se ancla a la grilla del mosaico, así que necesita el <canvas>
+  // ya en el DOM y con su alto final. Si todavía no está (mosaico lento
+  // —invierno tiene más fotos que otoño— o si saltó antes la red de
+  // seguridad de markMosaicReady), reintenta en lugar de repartir las
+  // texturas sobre un alto provisorio y dejarlas desalineadas.
+  const canvasEl = document.querySelector('#canvas-holder canvas');
+  if (!canvasEl || !canvasEl.height) {
+    setTimeout(construirTexturas, 400);
+    return;
+  }
 
   // Medidas fijas de cada rectángulo, en cuadrados de la grilla:
   //   alto  = 2 cuadrados (recortes del mosaico). Cada recorte mide
@@ -1236,8 +1412,17 @@ function construirTexturas() {
   const colPx = anchoVisible / 13;
   const filaPx = colPx / 2;
   texturaCapa.style.setProperty('--col', colPx + 'px');
-  const canvasEl = document.querySelector('#canvas-holder canvas');
-  const pageH = (canvasEl && canvasEl.getBoundingClientRect().height) ||
+
+  // Alinear la capa con el canvas. La capa es inset:0 sobre .contenido y
+  // el <canvas> del mosaico puede arrancar unos píxeles más abajo dentro
+  // de ese bloque; sin corregirlo, todas las texturas quedan ese mismo
+  // tanto por debajo de las líneas de la grilla ("parten un poco más
+  // abajo"). Medimos la diferencia real y la absorbemos moviendo la capa.
+  const desfase = canvasEl.getBoundingClientRect().top -
+                  texturaCapa.getBoundingClientRect().top;
+  texturaCapa.style.top = (desfase > 0 ? desfase : 0) + 'px';
+
+  const pageH = canvasEl.getBoundingClientRect().height ||
                 texturaCapa.offsetHeight ||
                 document.documentElement.scrollHeight || 1;
   const filasTotal = Math.max(6, Math.floor(pageH / filaPx));
@@ -1297,17 +1482,18 @@ function construirTexturas() {
     fig.style.setProperty('--w', 'calc(var(--col) * ' + w + ')');
     fig.style.setProperty('--h', 'calc(var(--col) * ' + ALTO_CUADRADOS + ')');
 
-    // top ANCLADO a la grilla del mosaico, de una de dos maneras (al azar):
-    //   - 'linea': el borde de arriba arranca donde arranca un recorte
-    //             del mosaico  -> k filas  -> top = --col * (k/2)
-    //   - 'media': arranca a la mitad de la altura de un recorte
-    //             -> k filas + media fila -> top = --col * (k/2 + 0.25)
-    // (una fila = un recorte = --col/2 de alto). La fila k arranca en la
-    // fila objetivo del reparto parejo (i * pasoFilas) y se le suma un
-    // jitter chico; después se reintenta si taparía a otra textura más
-    // del 60% (MAX_TAPADO).
+    // top ANCLADO a la grilla del mosaico: el borde de arriba arranca
+    // donde arranca un recorte -> k filas -> top = --col * (k/2). La fila
+    // k sale del reparto parejo (i * pasoFilas) más un jitter chico, y se
+    // reintenta si taparía a otra textura más del 60% (MAX_TAPADO).
+    //
+    // Antes la mitad de las texturas arrancaban a MEDIA fila (a la mitad
+    // de un recorte); se leía como que "parten un poco más abajo" de la
+    // grilla. Ahora todas caen sobre una línea entera. Para volver a
+    // permitir el arranque a media fila:
+    //   const enMedio = Math.random() < 0.5;
     const hPx = ALTO_CUADRADOS * colPx;        // alto de la textura (2 filas)
-    const enMedio = Math.random() < 0.5;
+    const enMedio = false;
     // la fila de arranque no puede pasar la última que deja entrar las
     // 2 filas de alto sin cortarse por abajo (media fila menos si arranca
     // "en la mitad").
@@ -1512,11 +1698,13 @@ function renderFlowMosaic(tiles, rowHeight, minWidth, maxWidth, onDone) {
 // BARRA DE ESTACIONES
 // ---------------------------------------------------------------------
 // La barra de arriba (index.html, <nav class="topbar">) tiene 5 botones:
-// "Estaciones" + las 4 estaciones. Por ahora SOLO "Otoño" está activo:
-// es lo que se ve al abrir (poemas de assets/poemas/otono.yaml + mosaico
-// + texturas, todo con fotos de otoño). Invierno, Primavera y Verano
-// todavía no tienen fotos ni poemas propios, así que sus botones no
-// hacen nada. Cuando los tengan, acá se engancha el cambio de estación.
+// "Estaciones" + las 4 estaciones. La estación que se ve la define
+// CURRENT_SEASON, que sale del parámetro ?estacion=... de la URL (ver el
+// mapa ESTACIONES más arriba). Al tocar el botón de una estación con
+// assets (Otoño o Invierno) se pone ese parámetro y se recarga la
+// página, así todo —mosaico, poemas y texturas— se arma de cero con las
+// fotos y el YAML de esa estación. Primavera y Verano todavía no tienen
+// assets, así que sus botones no hacen nada.
 //
 // "Estaciones" abre una intro (index.html, #introOverlay) donde va la
 // explicación de los poemas.
@@ -1537,9 +1725,14 @@ function renderFlowMosaic(tiles, rowHeight, minWidth, maxWidth, onDone) {
   barra.querySelectorAll('.topbar-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       if (btn.dataset.accion === 'intro') { abrirIntro(); return; }
-      // Estaciones sin fotos/poemas propios: por ahora no hacen nada.
-      // Acá irá loadSeasonPoem(btn.dataset.season) + rearmar el mosaico
-      // cuando existan los assets de esa estación.
+      const season = btn.dataset.season;
+      // Estación sin assets propios (Primavera, Verano): no hace nada.
+      if (!season || !ESTACIONES[season] || season === CURRENT_SEASON) return;
+      // Cambiar de estación = recargar con ?estacion=... : el mosaico, los
+      // poemas y las texturas se rearman de cero al volver a cargar.
+      const url = new URL(location.href);
+      url.searchParams.set('estacion', season);
+      location.assign(url);
     });
   });
 
