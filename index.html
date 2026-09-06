@@ -5,7 +5,7 @@
 <title>Mosaico por color</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=26">
+<link rel="stylesheet" href="style.css?v=37">
 <script>
   // La página tiene que abrir siempre desde arriba del todo. Si el
   // navegador restaura la posición de scroll de una visita anterior (o
@@ -30,9 +30,12 @@
   <button class="topbar-btn" type="button" data-season="primavera">Primavera</button>
   <button class="topbar-btn" type="button" data-season="verano">Verano</button>
 </nav>
-<!-- Todo el contenido va dentro de .contenido, que arranca justo debajo
-     de la barra (position: sticky, en el flujo). Así el mosaico, los
-     poemas y las texturas nunca quedan tapados por los botones. -->
+<!-- Todo lo que scrollea va dentro de .scroll-area, que arranca JUSTO
+     debajo de la barra y tiene su propio scroll. Así la barra de scroll
+     empieza abajo de los botones, no detrás de ellos. La barra superior
+     queda fija arriba, fuera de esta caja. -->
+<div class="scroll-area">
+<!-- El mosaico, los poemas y las texturas van dentro de .contenido. -->
 <div class="contenido">
 <div class="poem-card" id="poemCard"></div>
 <!-- efecto texturas: capa de fotos apaisadas entre el mosaico y los
@@ -131,8 +134,9 @@
   <img src="assets/imagenes/textura-invierno-01.jpg" alt="" loading="lazy">
   <img src="assets/imagenes/textura-otono-06.jpeg" alt="" loading="lazy">
 </section>
+</div><!-- /.scroll-area -->
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
-<script src="script.js?v=26"></script>
+<script src="script.js?v=37"></script>
 </body>
 </html>

@@ -589,7 +589,7 @@ function startMosaicDrift(ctx, tiles, n, tileW, tileH, cols, total) {
   // cuadrados en movimiento y a distintas alturas del recorrido.
   if (MOSAICO_MODO === 'desliz') {
     const enRegimen = Math.min(
-      MOSAICO_MAX_ACTIVAS,
+      SEASON_MOSAICO_MAX,
       Math.round((total * MOSAICO_CAMBIO_PORCENTAJE / 100) *
                  (MOSAICO_DESLIZ_MS / MOSAICO_CAMBIO_INTERVALO)));
     for (let k = 0; k < enRegimen; k++) {
@@ -650,8 +650,8 @@ function iniciarDesliz(state) {
   const { tileW, tileH, cols, total, cellPan } = state;
   if (!cellPan) return;
   // Tope de simultáneos: por encima se ignora el pedido hasta que alguno
-  // termine (ver MOSAICO_MAX_ACTIVAS).
-  if (state.activas.length >= MOSAICO_MAX_ACTIVAS) return;
+  // termine (ver MOSAICO_MAX_ACTIVAS / SEASON_MOSAICO_MAX).
+  if (state.activas.length >= SEASON_MOSAICO_MAX) return;
 
   const celda = Math.floor(Math.random() * total);
   const pan = cellPan[celda];
@@ -724,6 +724,9 @@ const ESTACIONES = {
   invierno: {
     // sentido del degradado por brillo (ver SORT_MODE): oscuro arriba.
     orden: 'brightness-dark',
+    // más recortes deslizándose a la vez que el default (ver
+    // MOSAICO_MAX_ACTIVAS). Subilo/bajalo para más o menos movimiento.
+    mosaicoMax: 120,
     fotos: [
       'assets/imagenes/invierno-01.jpg',
       'assets/imagenes/invierno-02.jpg',
@@ -760,6 +763,10 @@ const SEASON_CFG = ESTACIONES[CURRENT_SEASON] ||
 // Sentido del degradado por brillo para la estación actual. Otoño va
 // claro → oscuro (como siempre); invierno, oscuro → claro.
 const SEASON_SORT_MODE = SEASON_CFG.orden || SORT_MODE;
+
+// Tope de recortes deslizándose a la vez para la estación actual: el que
+// pida ESTACIONES.<estacion>.mosaicoMax, o el default MOSAICO_MAX_ACTIVAS.
+const SEASON_MOSAICO_MAX = SEASON_CFG.mosaicoMax || MOSAICO_MAX_ACTIVAS;
 
 // Marca la estación en el <body> para que el CSS pueda cambiar cosas por
 // estación (por ahora, el color del velo; ver body[data-estacion] en
@@ -918,7 +925,7 @@ const poemCard = document.getElementById('poemCard');
 //     SCROLL_RESET_MS     - cada cuánto, como mucho, la actividad seguida
 //                           (mousemove sobre todo) se procesa
 // =====================================================================
-const EFECTO_ESCRITURA = true;
+const EFECTO_ESCRITURA = false;
 
 const TYPE_CHAR_MS = 33;
 const TYPE_LINE_PAUSE = 280;
@@ -1656,7 +1663,10 @@ function iniciarDeslizScroll() {
     ticking = true;
     requestAnimationFrame(actualizar);
   }
-  window.addEventListener('scroll', alScroll, { passive: true });
+  // El scroll ahora vive en .scroll-area (arranca debajo de la barra), no
+  // en window. Escuchamos ahí; el resize sigue en window.
+  const scroller = document.querySelector('.scroll-area') || window;
+  scroller.addEventListener('scroll', alScroll, { passive: true });
   window.addEventListener('resize', alScroll, { passive: true });
   actualizar();
 }

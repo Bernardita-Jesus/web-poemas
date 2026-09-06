@@ -23,13 +23,22 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: 'IBM Plex Sans', sans-serif;
-  min-height: 100%;
-  /* clip (no 'hidden'): corta el desborde horizontal sin volver a
-     html/body un contenedor de scroll, así la barra superior
-     (position: sticky) sigue pegándose bien al borde de arriba. */
+  /* La página NO scrollea: el scroll lo maneja .scroll-area, que arranca
+     debajo de la barra superior. Así la barra de scroll empieza abajo de
+     los botones, no detrás de ellos. */
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Caja con scroll propio, justo debajo de la barra. */
+.scroll-area {
+  height: calc(100dvh - var(--barra-alto));
+  overflow-y: auto;
+  /* clip: corta el desborde horizontal (el desliz de las texturas) sin
+     agregar barra horizontal. */
   overflow-x: clip;
-  /* al dibujarse el mosaico la página cambia mucho de alto; sin esto el
-     navegador puede "anclar" el scroll y moverlo del tope. */
+  /* al dibujarse el mosaico el contenido cambia mucho de alto; sin esto
+     el navegador puede "anclar" el scroll y moverlo del tope. */
   overflow-anchor: none;
 }
 
@@ -37,17 +46,37 @@ html, body {
    Barra de scroll: mínima y casi invisible, en un morado clarito
    translúcido (tinte claro del morado del botón "Estaciones", #6f6480).
    El carril queda transparente; solo se ve el hilito del pulgar, que se
-   marca un poco más al pasar el mouse por la página. Firefox usa
+   marca un poco más al pasar el mouse por encima. Firefox usa
    scrollbar-width/-color; el resto, ::-webkit-scrollbar.
 --------------------------------------------------------------------- */
-html {
+/* Firefox: 'thin' ya viene sin flechitas. Lo ponemos en los dos por si
+   el que scrollea es uno u otro. */
+html,
+.scroll-area {
   scrollbar-width: thin;
   scrollbar-color: rgba(164, 152, 194, .30) transparent;
 }
-html:hover { scrollbar-color: rgba(164, 152, 194, .55) transparent; }
+.scroll-area:hover { scrollbar-color: rgba(164, 152, 194, .55) transparent; }
 
+/* Chrome / Edge / Safari */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
+/* sin flechitas en los extremos (todas las variantes, y a tamaño 0) */
+::-webkit-scrollbar-button,
+::-webkit-scrollbar-button:single-button,
+::-webkit-scrollbar-button:double-button,
+::-webkit-scrollbar-button:start,
+::-webkit-scrollbar-button:end,
+::-webkit-scrollbar-button:vertical:start,
+::-webkit-scrollbar-button:vertical:end,
+::-webkit-scrollbar-button:horizontal:start,
+::-webkit-scrollbar-button:horizontal:end {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+::-webkit-scrollbar-corner { background: transparent; }
 ::-webkit-scrollbar-thumb {
   /* el borde transparente + background-clip achica el pulgar visible a
      ~4px dentro de un carril de 10px */
@@ -524,7 +553,10 @@ body[data-estacion="invierno"]::after {
   top: 0;
   z-index: 20;
   display: flex;
-  border-bottom: 1px solid rgba(240, 227, 173, .25);
+  /* hilito de separación abajo: 0.5px (medio píxel en retina) y muy poca
+     opacidad, para que se lea lo más fino posible. En pantallas no-retina
+     queda en 1px pero, al ser tan tenue, parece más delgado. */
+  border-bottom: 0.5px solid rgba(240, 227, 173, .16);
 }
 .topbar-btn {
   flex: 1 1 0;
@@ -582,19 +614,39 @@ body[data-estacion="invierno"]::after {
    (el mosaico). Con una estación elegida es al revés.
 --------------------------------------------------------------------- */
 .estaciones-home { display: none; }
+/* fondo un poquito más blanco que el crema general (--bg) para esta vista */
+body.vista-estaciones { background: #fefcf4; }
+/* la pestaña "Estaciones" NO scrollea: se fija al alto de la ventana y lo
+   que sobra se recorta. Las fotos van en una grilla que reparte el
+   espacio: con pocas se ven grandes, al agregar más se achican para que
+   sigan entrando todas sin scroll. */
+body.vista-estaciones {
+  height: 100dvh;
+  overflow: hidden;
+}
 .vista-estaciones .wrap { display: none; }
 .vista-estaciones .estaciones-home {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 40px 20px 80px;
+  display: grid;
+  /* columnas que se reacomodan; el min(...) evita que se desborden en
+     pantallas angostas */
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  grid-auto-rows: 1fr;              /* filas de igual alto: se achican al sumar fotos */
+  gap: 12px;
+  padding: 16px;
+  height: calc(100dvh - var(--barra-alto));  /* lo que queda bajo la barra */
+  align-content: center;
+  justify-content: center;
+  overflow: hidden;
 }
 .estaciones-home img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  min-height: 0;                    /* deja que la celda de la grilla la achique */
+  max-height: 42vh;                 /* con pocas fotos, que no se hagan gigantes */
+  object-fit: cover;               /* llena la celda; recorta lo que sobra */
+  align-self: center;
+  justify-self: center;
+  max-width: 520px;
 }
 
