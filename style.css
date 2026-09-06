@@ -53,22 +53,18 @@ body {
 .vista-estaciones .scroll-area { overflow: hidden; }   /* estaciones: sin scroll */
 
 /* ---------------------------------------------------------------------
-   Barra de scroll: fina, morado clarito translúcido (tinte del morado
-   del botón "Estaciones", #6f6480), carril transparente.
+   Barra de scroll: fina y SIN flechitas, la misma que usa el navegador
+   por defecto en cualquier web.
 
-   Se usan SOLO las propiedades estándar scrollbar-width / scrollbar-color.
-   NO se usa ::-webkit-scrollbar: en Chrome, apenas se define ese
-   pseudo-elemento, el navegador cambia a la barra "vieja" que en Windows
-   trae las flechitas en las puntas. Con las propiedades estándar, Chrome
-   moderno (121+), Edge y Firefox muestran la barra fina SIN flechitas,
-   igual que en cualquier otra web.
+   Nada de ::-webkit-scrollbar ni de scrollbar-color: en algunas versiones
+   de Chrome sobre Windows, cualquiera de las dos hace que el navegador
+   caiga a la barra "vieja", que trae flechitas en las puntas. Con solo
+   scrollbar-width: thin, se queda con la barra fina moderna, sin flechas.
 --------------------------------------------------------------------- */
 html,
 .scroll-area {
   scrollbar-width: thin;
-  scrollbar-color: rgba(164, 152, 194, .45) transparent;
 }
-.scroll-area:hover { scrollbar-color: rgba(164, 152, 194, .65) transparent; }
 
 .wrap {
   display: grid;
