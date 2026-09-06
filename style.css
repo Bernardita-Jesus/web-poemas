@@ -340,6 +340,9 @@ body {
 .poem-card:empty {
   display: none;
 }
+/* Invierno reparte los poemas sobre un mosaico más largo (más recortes
+   reales por foto; ver mosaicoDensidad en script.js), así tienen más aire
+   entre sí sin quedar sobre el fondo pelado. Nada especial acá. */
 
 .poem {
   pointer-events: auto;

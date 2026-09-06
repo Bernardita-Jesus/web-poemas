@@ -53,7 +53,7 @@ const jitterVal = document.getElementById('jitterVal');
 // `orden`. El que se usa de verdad es SEASON_SORT_MODE (más abajo, junto
 // a CURRENT_SEASON).
 const SORT_MODE = 'brightness';
-const SORT_JITTER = 0.30;
+const SORT_JITTER = 0.25;
 
 // =====================================================================
 // EFECTO MOSAICO (opcional)
@@ -305,16 +305,21 @@ function buildMosaic() {
   const tileW = parseInt(tileWSlider.value, 10);
   const tileH = parseInt(tileHSlider.value, 10);
 
+  // Resolución de trabajo para ESTA estación: WORK_DIM por la densidad
+  // pedida (mosaicoDensidad). Más resolución = la grilla de abajo saca más
+  // recortes reales por foto = mosaico más largo y con más detalle.
+  const workDim = Math.round(WORK_DIM * ((SEASON_CFG && SEASON_CFG.mosaicoDensidad) || 1));
+
   // Pre-render each uploaded photo onto its own normalized square canvas at full working resolution.
   const normalized = uploadedImages.map(img => {
     const c = document.createElement('canvas');
-    c.width = WORK_DIM;
-    c.height = WORK_DIM;
+    c.width = workDim;
+    c.height = workDim;
     const cx = c.getContext('2d', { willReadFrequently: true });
-    const scale = Math.max(WORK_DIM / img.width, WORK_DIM / img.height) * ZOOM;
-    const sw = WORK_DIM / scale, sh = WORK_DIM / scale;
+    const scale = Math.max(workDim / img.width, workDim / img.height) * ZOOM;
+    const sw = workDim / scale, sh = workDim / scale;
     const sx = (img.width - sw) / 2, sy = (img.height - sh) / 2;
-    cx.drawImage(img, sx, sy, sw, sh, 0, 0, WORK_DIM, WORK_DIM);
+    cx.drawImage(img, sx, sy, sw, sh, 0, 0, workDim, workDim);
     return cx;
   });
 
@@ -322,13 +327,13 @@ function buildMosaic() {
   // poder deslizarnos dentro de ellas más tarde.
   mosaicSources = normalized.map(cx => cx.canvas);
 
-  const colsUnits = Math.floor(WORK_DIM / tileW);
-  const rowsUnits = Math.floor(WORK_DIM / tileH);
+  const colsUnits = Math.floor(workDim / tileW);
+  const rowsUnits = Math.floor(workDim / tileH);
 
   const jobs = [];
   normalized.forEach((cx, imgIdx) => {
     if (variable) {
-      const plan = planVariableWidths(WORK_DIM, rowHeight, minWidth, maxWidth);
+      const plan = planVariableWidths(workDim, rowHeight, minWidth, maxWidth);
       plan.forEach(p => {
         jobs.push({ imgIdx, px: p.x, py: p.y, w: p.w, h: p.h });
       });
@@ -454,6 +459,8 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
   // Una fila extra al final: se suma una línea entera de recortes debajo de
   // la última, sin tocar el tamaño de cada recorte. Esas celdas nuevas caen
   // en i >= n y se rellenan con la misma regla de reflejo que las sobrantes.
+  // (Para un mosaico más largo se genera MÁS recortes reales por foto; ver
+  // mosaicoDensidad en ESTACIONES / buildMosaic, no filas de relleno acá.)
   const rows = Math.ceil(n / cols) + 1;
   const total = rows * cols; // suele ser > n; las celdas sobrantes de la última fila se rellenan reflejando el final del array (ver más abajo)
 
@@ -705,6 +712,8 @@ const ESTACIONES = {
   otono: {
     // sentido del degradado por brillo (ver SORT_MODE): claro arriba.
     orden: 'brightness',
+    // cuántas texturas apaisadas se colocan (mínimo; ver construirTexturas)
+    texturasCantidad: 16,
     fotos: [
       'assets/imagenes/otono-04.jpg',
       'assets/imagenes/otono-07.jpg',
@@ -731,6 +740,15 @@ const ESTACIONES = {
     // más recortes deslizándose a la vez que el default (ver
     // MOSAICO_MAX_ACTIVAS). Subilo/bajalo para más o menos movimiento.
     mosaicoMax: 120,
+    // densidad del mosaico: cuántos recortes REALES se sacan de cada foto,
+    // como factor sobre el default (1 = 8x16 por foto). 1.25 = ~1.5x más
+    // recortes -> mosaico más largo y con más detalle, todos iguales,
+    // ordenados en el mismo degradado (no son filas de relleno). Sirve
+    // para que los poemas tengan más aire entre sí. Subilo para más
+    // (1.5, 2...). Ver buildMosaic.
+    mosaicoDensidad: 1.25,
+    // cuántas texturas apaisadas se colocan (mínimo; ver construirTexturas)
+    texturasCantidad: 23,
     fotos: [
       'assets/imagenes/invierno-01.jpg',
       'assets/imagenes/invierno-02.jpg',
@@ -739,6 +757,7 @@ const ESTACIONES = {
       'assets/imagenes/invierno-05.jpg',
       'assets/imagenes/invierno-06.jpg',
       'assets/imagenes/invierno-07.jpg',
+      'assets/imagenes/invierno-08.jpg',
       'assets/imagenes/invierno-09.jpg',
       'assets/imagenes/invierno-10.jpg',
       'assets/imagenes/invierno-11.jpg',
@@ -1295,7 +1314,8 @@ function revealOnScroll() {
 
 function loadSeasonPoem(season) {
   if (!poemCard || typeof jsyaml === 'undefined') return;
-  fetch('assets/poemas/' + season + '.yaml')
+  // ?t=... para que al actualizar los poemas se vean sin esperar la caché
+  fetch('assets/poemas/' + season + '.yaml?t=' + Date.now(), { cache: 'no-store' })
     .then(res => res.text())
     .then(yamlText => {
       const poems = jsyaml.load(yamlText);
@@ -1467,12 +1487,13 @@ function construirTexturas() {
                 document.documentElement.scrollHeight || 1;
   const filasTotal = Math.max(6, Math.floor(pageH / filaPx));
 
-  // Cuántas texturas: las pedidas en TEXTURAS_CANTIDAD, pero nunca menos
-  // de las que hacen falta para que ninguna quede a más de
-  // MAX_HUECO_FILAS filas de la siguiente.
+  // Cuántas texturas: las pedidas (por estación con texturasCantidad, o
+  // TEXTURAS_CANTIDAD por defecto), pero nunca menos de las que hacen
+  // falta para que ninguna quede a más de MAX_HUECO_FILAS de la siguiente.
+  const cantidadPedida = (SEASON_CFG && SEASON_CFG.texturasCantidad) || TEXTURAS_CANTIDAD;
   const cuantasMin = 1 + Math.ceil((filasTotal - ALTO_FILAS) /
                                    (MAX_HUECO_FILAS + ALTO_FILAS));
-  const cuantas = Math.max(1, TEXTURAS_CANTIDAD, cuantasMin);
+  const cuantas = Math.max(1, cantidadPedida, cuantasMin);
 
   // Reparto vertical parejo: la textura i apunta a la fila i * pasoFilas,
   // desde la 0 (arriba de todo) hasta filasTotal - ALTO_FILAS (abajo de
