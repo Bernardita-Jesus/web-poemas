@@ -11,6 +11,10 @@ const prefersReducedMotion = !!(window.matchMedia &&
 // ya entraron en pantalla esperan su turno en esta cola.
 let mosaicReady = false;
 const pendingTypewriter = [];
+// Los poemas y las fechas no se muestran hasta que el mosaico de fotos
+// terminó de dibujarse. Si los poemas se cargan antes, quedan armados
+// pero ocultos y esto marca que hay un "reveal" esperando.
+let revealPendiente = false;
 
 // Recortes ya calculados (color, brillo, imgData) del último mosaico armado,
 // y el layout con el que se dibujaron.
@@ -972,6 +976,8 @@ function markMosaicReady() {
   if (mosaicReady) return;
   mosaicReady = true;
   pendingTypewriter.splice(0).forEach(runTypewriter);
+  // recién con las fotos dibujadas se dejan aparecer los poemas y las fechas
+  if (revealPendiente) { revealPendiente = false; revealOnScroll(); }
   // efecto texturas: recién ahora la página tiene su alto final (el
   // canvas del mosaico ya está dibujado), así que es el momento de armar
   // la capa de texturas. Si se armara antes, las fotos se repartirían
@@ -1261,9 +1267,12 @@ function renderPoemList(poems) {
   revealOnScroll();
 }
 
-// Muestra cada poema con un fundido cuando entra en el viewport y, al
-// mismo tiempo, arranca el efecto escritura sobre su título y sus versos.
+// Muestra cada poema (título, fecha y versos) con un fundido cuando entra
+// en el viewport. No arranca hasta que el mosaico de fotos terminó de
+// dibujarse: si todavía no, se deja en espera y markMosaicReady() vuelve
+// a llamar acá. Así los poemas y las fechas aparecen junto con las fotos.
 function revealOnScroll() {
+  if (!mosaicReady) { revealPendiente = true; return; }
   const items = poemCard.querySelectorAll('.poem');
   if (!('IntersectionObserver' in window)) {
     items.forEach(el => {
