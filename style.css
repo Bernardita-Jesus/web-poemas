@@ -53,18 +53,46 @@ body {
 .vista-estaciones .scroll-area { overflow: hidden; }   /* estaciones: sin scroll */
 
 /* ---------------------------------------------------------------------
-   Barra de scroll: fina y SIN flechitas, la misma que usa el navegador
-   por defecto en cualquier web.
-
-   Nada de ::-webkit-scrollbar ni de scrollbar-color: en algunas versiones
-   de Chrome sobre Windows, cualquiera de las dos hace que el navegador
-   caiga a la barra "vieja", que trae flechitas en las puntas. Con solo
-   scrollbar-width: thin, se queda con la barra fina moderna, sin flechas.
+   Barra de scroll de .scroll-area (la única que scrollea). Se ve:
+     - el fondo de la barra (track), morado muy clarito;
+     - el pulgar, un rectángulo redondeado morado.
+   SIN flechitas: en Chrome (Windows) los contenedores internos con
+   overflow traen flechas por defecto, así que se ocultan con
+   ::-webkit-scrollbar-button { display: none }.
+   Firefox no tiene flechitas nunca; usa scrollbar-width/-color.
 --------------------------------------------------------------------- */
-html,
 .scroll-area {
   scrollbar-width: thin;
+  scrollbar-color: #b3a9d0 #ece8f4;        /* Firefox: pulgar, fondo */
 }
+.scroll-area::-webkit-scrollbar { width: 12px; }
+.scroll-area::-webkit-scrollbar-track { background: #ece8f4; }
+.scroll-area::-webkit-scrollbar-thumb {
+  background: #b3a9d0;
+  border: 3px solid #ece8f4;               /* separa el pulgar del borde del track */
+  background-clip: padding-box;
+  border-radius: 20px;
+  transition: background-color .2s ease;
+}
+.scroll-area::-webkit-scrollbar-thumb:hover { background: #9f93c2; }
+/* sin flechitas: se cubren TODAS las variantes de botón, a tamaño 0 */
+.scroll-area::-webkit-scrollbar-button,
+.scroll-area::-webkit-scrollbar-button:start,
+.scroll-area::-webkit-scrollbar-button:end,
+.scroll-area::-webkit-scrollbar-button:single-button,
+.scroll-area::-webkit-scrollbar-button:double-button,
+.scroll-area::-webkit-scrollbar-button:vertical:decrement,
+.scroll-area::-webkit-scrollbar-button:vertical:increment,
+.scroll-area::-webkit-scrollbar-button:horizontal:decrement,
+.scroll-area::-webkit-scrollbar-button:horizontal:increment {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+  width: 0;
+  height: 0;
+  background: transparent;
+}
+.scroll-area::-webkit-scrollbar-corner { background: #ece8f4; }
 
 .wrap {
   display: grid;
