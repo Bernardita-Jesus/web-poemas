@@ -23,16 +23,25 @@ html, body {
   background: var(--bg);
   color: var(--text);
   font-family: 'IBM Plex Sans', sans-serif;
-  /* La página NO scrollea: el scroll lo maneja .scroll-area, que arranca
-     debajo de la barra superior. Así la barra de scroll empieza abajo de
-     los botones, no detrás de ellos. */
-  height: 100%;
-  overflow: hidden;
 }
 
-/* Caja con scroll propio, justo debajo de la barra. */
+/* La página NUNCA scrollea: el body ocupa exacto la ventana y se parte en
+   dos por flex —la barra arriba, y .scroll-area con el resto—. .scroll-area
+   es la ÚNICA que scrollea, y por flex ocupa justo lo que queda bajo la
+   barra (sin calc, así no hay desajustes de redondeo que a veces hacían
+   aparecer una barra de scroll de página entera, por detrás de los
+   botones). En "Estaciones" el contenido entra justo y no aparece. */
+html { height: 100%; }
+body {
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.topbar { flex: none; }              /* la barra no se encoge */
 .scroll-area {
-  height: calc(100dvh - var(--barra-alto));
+  flex: 1 1 auto;
+  min-height: 0;                     /* deja que scrollee en vez de estirar el body */
   overflow-y: auto;
   /* clip: corta el desborde horizontal (el desliz de las texturas) sin
      agregar barra horizontal. */
@@ -41,52 +50,25 @@ html, body {
      el navegador puede "anclar" el scroll y moverlo del tope. */
   overflow-anchor: none;
 }
+.vista-estaciones .scroll-area { overflow: hidden; }   /* estaciones: sin scroll */
 
 /* ---------------------------------------------------------------------
-   Barra de scroll: mínima y casi invisible, en un morado clarito
-   translúcido (tinte claro del morado del botón "Estaciones", #6f6480).
-   El carril queda transparente; solo se ve el hilito del pulgar, que se
-   marca un poco más al pasar el mouse por encima. Firefox usa
-   scrollbar-width/-color; el resto, ::-webkit-scrollbar.
+   Barra de scroll: fina, morado clarito translúcido (tinte del morado
+   del botón "Estaciones", #6f6480), carril transparente.
+
+   Se usan SOLO las propiedades estándar scrollbar-width / scrollbar-color.
+   NO se usa ::-webkit-scrollbar: en Chrome, apenas se define ese
+   pseudo-elemento, el navegador cambia a la barra "vieja" que en Windows
+   trae las flechitas en las puntas. Con las propiedades estándar, Chrome
+   moderno (121+), Edge y Firefox muestran la barra fina SIN flechitas,
+   igual que en cualquier otra web.
 --------------------------------------------------------------------- */
-/* Firefox: 'thin' ya viene sin flechitas. Lo ponemos en los dos por si
-   el que scrollea es uno u otro. */
 html,
 .scroll-area {
   scrollbar-width: thin;
-  scrollbar-color: rgba(164, 152, 194, .30) transparent;
+  scrollbar-color: rgba(164, 152, 194, .45) transparent;
 }
-.scroll-area:hover { scrollbar-color: rgba(164, 152, 194, .55) transparent; }
-
-/* Chrome / Edge / Safari */
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: transparent; }
-/* sin flechitas en los extremos (todas las variantes, y a tamaño 0) */
-::-webkit-scrollbar-button,
-::-webkit-scrollbar-button:single-button,
-::-webkit-scrollbar-button:double-button,
-::-webkit-scrollbar-button:start,
-::-webkit-scrollbar-button:end,
-::-webkit-scrollbar-button:vertical:start,
-::-webkit-scrollbar-button:vertical:end,
-::-webkit-scrollbar-button:horizontal:start,
-::-webkit-scrollbar-button:horizontal:end {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
-  background: transparent !important;
-}
-::-webkit-scrollbar-corner { background: transparent; }
-::-webkit-scrollbar-thumb {
-  /* el borde transparente + background-clip achica el pulgar visible a
-     ~4px dentro de un carril de 10px */
-  background-color: rgba(164, 152, 194, .28);
-  border: 3px solid transparent;
-  background-clip: padding-box;
-  border-radius: 8px;
-  transition: background-color .2s ease;
-}
-::-webkit-scrollbar-thumb:hover { background-color: rgba(164, 152, 194, .6); }
+.scroll-area:hover { scrollbar-color: rgba(164, 152, 194, .65) transparent; }
 
 .wrap {
   display: grid;
@@ -620,10 +602,6 @@ body.vista-estaciones { background: #fefcf4; }
    que sobra se recorta. Las fotos van en una grilla que reparte el
    espacio: con pocas se ven grandes, al agregar más se achican para que
    sigan entrando todas sin scroll. */
-body.vista-estaciones {
-  height: 100dvh;
-  overflow: hidden;
-}
 .vista-estaciones .wrap { display: none; }
 .vista-estaciones .estaciones-home {
   display: grid;
@@ -633,7 +611,7 @@ body.vista-estaciones {
   grid-auto-rows: 1fr;              /* filas de igual alto: se achican al sumar fotos */
   gap: 12px;
   padding: 16px;
-  height: calc(100dvh - var(--barra-alto));  /* lo que queda bajo la barra */
+  height: 100%;                     /* llena .scroll-area (que ya es el resto bajo la barra) */
   align-content: center;
   justify-content: center;
   overflow: hidden;
