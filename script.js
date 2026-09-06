@@ -711,6 +711,10 @@ function iniciarDesliz(state) {
 // ---------------------------------------------------------------------
 const ESTACIONES = {
   otono: {
+    // nombre y año para el rótulo del pase de fotos de la pestaña
+    // "Estaciones" (ver "FOTOS DE LA PESTAÑA ESTACIONES").
+    nombre: 'Otoño',
+    anio: 2026,
     // sentido del degradado por brillo (ver SORT_MODE): claro arriba.
     orden: 'brightness',
     // cuántas texturas apaisadas se colocan (mínimo; ver construirTexturas)
@@ -736,6 +740,10 @@ const ESTACIONES = {
     ],
   },
   invierno: {
+    // nombre y año para el rótulo del pase de fotos de la pestaña
+    // "Estaciones" (ver "FOTOS DE LA PESTAÑA ESTACIONES").
+    nombre: 'Invierno',
+    anio: 2026,
     // sentido del degradado por brillo (ver SORT_MODE): oscuro arriba.
     orden: 'brightness-dark',
     // cuántos recortes deslizándose a la vez (ver MOSAICO_MAX_ACTIVAS).
@@ -1220,7 +1228,7 @@ function renderPoemList(poems) {
   poemCard.innerHTML = '';
 
   poems
-    .slice()
+    .filter(poem => !poem.oculto)   // poemas con "oculto: true" no se muestran
     .sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
     .forEach((poem, poemIndex) => {
       const article = document.createElement('article');
@@ -1811,6 +1819,71 @@ function renderFlowMosaic(tiles, rowHeight, minWidth, maxWidth, onDone) {
       irA(btn.dataset.accion === 'intro' ? null : btn.dataset.season);
     });
   });
+})();
+
+// =====================================================================
+// FOTOS DE LA PESTAÑA "ESTACIONES"
+// ---------------------------------------------------------------------
+// El recuadro de arriba a la derecha (#estacionesHome .estaciones-cuadro)
+// pasa las MISMAS fotos que usan los mosaicos —juntando las de todas las
+// estaciones (ESTACIONES.<x>.fotos)— de a UNA, cambiando cada
+// ESTACIONES_FOTO_MS con un fundido cruzado (dos capas <img>). Debajo de
+// cada foto, un rótulo con su estación y año ("otoño 2026" / "invierno
+// 2026"), que sale de ESTACIONES.<x>.nombre y .anio. Solo corre en la
+// pestaña de entrada (sin estación elegida).
+// =====================================================================
+const ESTACIONES_FOTO_MS = 6500;
+(function () {
+  if (CURRENT_SEASON) return;
+  const cuadro = document.querySelector('.estaciones-cuadro');
+  if (!cuadro) return;
+
+  // Cada entrada: la ruta de la foto y el rótulo de su estación, para
+  // poder escribir "otoño 2026" / "invierno 2026" debajo.
+  const items = [];
+  Object.keys(ESTACIONES).forEach(key => {
+    const cfg = ESTACIONES[key];
+    const etiqueta = (cfg.nombre || key) + (cfg.anio ? ' ' + cfg.anio : '');
+    (cfg.fotos || []).forEach(r => items.push({ ruta: r, etiqueta }));
+  });
+  if (items.length === 0) return;
+  barajar(items);
+
+  // dos capas para el fundido cruzado
+  const a = document.createElement('img');
+  const b = document.createElement('img');
+  a.alt = b.alt = '';
+  cuadro.appendChild(a);
+  cuadro.appendChild(b);
+
+  // rótulo con la estación y el año de la foto visible: va JUSTO DEBAJO
+  // de la foto, así que cuelga de .estaciones-home (el .estaciones-cuadro
+  // recorta lo que se sale de su caja).
+  const pie = document.createElement('div');
+  pie.className = 'estaciones-cuadro-pie';
+  (cuadro.parentElement || cuadro).appendChild(pie);
+
+  let i = 0;
+  let visible = a, oculta = b;
+  a.src = items[0].ruta;
+  a.classList.add('visible');
+  pie.textContent = items[0].etiqueta;
+  pie.classList.add('visible');
+
+  if (items.length < 2 || prefersReducedMotion) return; // una sola foto: sin rotación
+
+  setInterval(() => {
+    i = (i + 1) % items.length;
+    const pre = new Image();
+    pre.onload = () => {
+      oculta.src = items[i].ruta;           // ya cacheada: sin parpadeo
+      oculta.classList.add('visible');
+      visible.classList.remove('visible');
+      const t = visible; visible = oculta; oculta = t;
+      pie.textContent = items[i].etiqueta;
+    };
+    pre.src = items[i].ruta;
+  }, ESTACIONES_FOTO_MS);
 })();
 
 // =====================================================================

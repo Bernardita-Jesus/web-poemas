@@ -136,6 +136,7 @@
 - fecha: 2026-07-21
   fecha_texto: "Martes 21 de julio, invierno 2026"
   titulo: null
+  oculto: true          # no se muestra en la web (renderPoemList lo saltea)
   fotos: []
   texto: |
     Estas ideas devastadoras,

@@ -11,7 +11,7 @@
 <title>Mosaico por color</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=67">
+<link rel="stylesheet" href="style.css?v=104">
 <script>
   // La página tiene que abrir siempre desde arriba del todo. Si el
   // navegador restaura la posición de scroll de una visita anterior (o
@@ -131,14 +131,24 @@
 </div>
 
 <!-- Pestaña "Estaciones": lo primero que se ve al entrar a la web (sin
-     ?estacion=... en la URL). Página aparte, en blanco, solo con fotos:
-     sin mosaico ni poemas. Para sumar fotos, agregá una línea <img> por
-     cada una, apuntando a un archivo de assets/imagenes/. Las de ahora
-     son de ejemplo. La barra de arriba se muestra siempre. -->
+     ?estacion=... en la URL). Página aparte, en blanco: sin mosaico ni
+     poemas. La barra de arriba se muestra siempre. El recuadro de la
+     derecha lo llena script.js con las fotos de los mosaicos. -->
 <section class="estaciones-home" id="estacionesHome">
-  <img src="assets/imagenes/textura-otono-02.jpeg" alt="" loading="lazy">
-  <img src="assets/imagenes/textura-invierno-01.jpg" alt="" loading="lazy">
-  <img src="assets/imagenes/textura-otono-06.jpeg" alt="" loading="lazy">
+  <!-- Texto de entrada: título, subtítulo y un párrafo de presentación.
+       Ocupa la mitad izquierda de la pantalla; el pase de fotos va a la
+       derecha (.estaciones-cuadro). Ver .estaciones-texto en style.css. -->
+  <div class="estaciones-texto">
+    <h1>Mis poemas por<br>estación del año 2026</h1>
+    <p class="estaciones-sub">Poemas o un diario</p>
+    <p class="estaciones-cuerpo">Las estaciones del año conforman un espacio muy importante en mi quehacer y en mi manera de habitar. Son, quizás, lo único que me permite mantener una perspectiva sobre el paso del tiempo, al que temo, pero que encuentro una manera más dulce y esperanzadora de sentir a través de ellas.</p>
+    <p class="estaciones-cuerpo">Las estaciones me recuerdan que los días continúan, que siempre habrá un mañana; que existen etapas, ciclos y procesos que se están gestando.</p>
+  </div>
+  <!-- Recuadro arriba a la derecha: del 60% del ancho (donde arranca el
+       botón "Primavera", 4º de 5) al borde derecho, y de arriba hasta la
+       mitad de la pantalla. script.js lo llena con las MISMAS fotos que
+       usan los mosaicos (ESTACIONES.<estacion>.fotos). -->
+  <div class="estaciones-cuadro"></div>
 </section>
 </div><!-- /.scroll-area -->
 
@@ -150,6 +160,6 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
-<script src="script.js?v=67"></script>
+<script src="script.js?v=104"></script>
 </body>
 </html>

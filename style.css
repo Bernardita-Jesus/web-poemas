@@ -46,9 +46,11 @@ body {
   /* clip: corta el desborde horizontal (el desliz de las texturas) sin
      agregar barra horizontal. */
   overflow-x: clip;
-  /* al dibujarse el mosaico el contenido cambia mucho de alto; sin esto
-     el navegador puede "anclar" el scroll y moverlo del tope. */
-  overflow-anchor: none;
+  /* anclaje de scroll ACTIVO: si algo por encima cambia de alto (fuentes
+     que cargan, imágenes que decodifican), el navegador compensa y el
+     texto no salta al bajar. Los poemas se excluyen del anclaje (abajo)
+     para que su animación de entrada no dispare ese salto. */
+  overflow-anchor: auto;
 }
 .vista-estaciones .scroll-area { overflow: hidden; }   /* estaciones: sin scroll */
 
@@ -349,9 +351,13 @@ body {
   max-width: min(680px, 90vw);
   color: #e8ff00;
   text-shadow: 0 2px 4px rgba(0, 0, 0, .55), 0 1px 20px rgba(0, 0, 0, .6);
+  /* entra con fundido + un leve traslado hacia arriba */
   opacity: 0;
   transform: translateY(28px);
   transition: opacity .8s ease, transform .8s ease;
+  /* que el poema no sea "ancla" de scroll: su animación de entrada no
+     debe empujar la posición del scroll. */
+  overflow-anchor: none;
 }
 .poem.visible {
   opacity: 1;
@@ -632,6 +638,7 @@ body.vista-estaciones { background: #fefcf4; }
    sigan entrando todas sin scroll. */
 .vista-estaciones .wrap { display: none; }
 .vista-estaciones .estaciones-home {
+  position: relative;              /* ancla del cuadrado de arriba a la derecha */
   display: grid;
   /* columnas que se reacomodan; el min(...) evita que se desborden en
      pantallas angostas */
@@ -643,7 +650,68 @@ body.vista-estaciones { background: #fefcf4; }
   align-content: center;
   justify-content: center;
   overflow: hidden;
+  /* franja libre bajo la foto para el rótulo "otoño 2026": la usan el
+     inset de abajo de .estaciones-cuadro y el alto de .estaciones-cuadro-pie,
+     así el rótulo queda apegado al borde inferior de la foto. */
+  --foto-pie: 4rem;
 }
+/* Pase de fotos arriba a la derecha: desde el 60% del ancho (donde
+   arranca el botón "Primavera", 4º de 5) hasta el borde derecho, y de
+   arriba abajo de la pantalla de Estaciones. Sin recuadro ni fondo: solo
+   la foto. Pasa UNA a la vez (las mismas de los mosaicos), cambiando cada
+   ciertos segundos con un fundido. Lo maneja script.js ("FOTOS DE LA
+   PESTAÑA ESTACIONES"). Todas las fotos ocupan exactamente el mismo
+   espacio (object-fit: cover). */
+.estaciones-cuadro {
+  position: absolute;
+  /* arranca en el 40% (pegado al borde del texto) => foto bien ancha. El
+     borde de abajo deja libre --foto-pie para el rótulo "otoño 2026". */
+  inset: 0 0 var(--foto-pie, 4vh) 40%;
+  overflow: hidden;
+}
+.estaciones-cuadro img {
+  position: absolute;
+  inset: 0;
+  /* llenar TODA la caja y recortar lo que sobra (la regla vieja
+     .estaciones-home img las limitaba a 520px / 42vh y quedaban chicas
+     arriba a la izquierda). */
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: cover;
+  object-position: left bottom;
+  opacity: 0;
+  transition: opacity .55s ease;
+}
+.estaciones-cuadro img.visible { opacity: 1; }
+/* Rótulo estación + año ("otoño 2026"): justo debajo de la foto, apegado
+   a su borde inferior, alineado con su esquina izquierda. Cuelga de
+   .estaciones-home (no de .estaciones-cuadro, que recortaría). Ocupa la
+   franja --foto-pie que la foto deja libre abajo. Sin fondo ni sombra:
+   texto sobre el crema de la pestaña. `left` = mismo borde que la foto. */
+.estaciones-cuadro-pie {
+  position: absolute;
+  left: 40%;
+  bottom: 0;
+  height: var(--foto-pie, 4vh);
+  display: flex;
+  align-items: flex-start;      /* pegado al pie de la foto */
+  padding-top: 2px;
+  /* nudge respecto de la esquina inferior izquierda de la foto:
+     translate(x, y) — x positivo lo corre a la derecha, y negativo lo
+     sube (se monta sobre la imagen). */
+  transform: translate(200px, -150px);
+  margin: 0;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  color: var(--text-dim);
+  opacity: 0;
+  transition: opacity .55s ease;
+}
+.estaciones-cuadro-pie.visible { opacity: 1; }
 .estaciones-home img {
   display: block;
   width: 100%;
@@ -654,5 +722,61 @@ body.vista-estaciones { background: #fefcf4; }
   align-self: center;
   justify-self: center;
   max-width: 520px;
+}
+
+/* Texto de presentación de la pestaña "Estaciones": ocupa la mitad
+   izquierda (hasta donde arranca el pase de fotos, 52%) y queda centrado
+   en vertical. Absoluto igual que .estaciones-cuadro, así queda fuera de
+   la grilla de .estaciones-home. */
+.estaciones-texto {
+  position: absolute;
+  inset: 0 60% 0 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  padding: 6vw clamp(24px, 5vw, 72px);
+  /* el bloque, centrado en vertical, se sube un poco respecto del medio */
+  transform: translateY(-8vh);
+  overflow: hidden;
+}
+.estaciones-texto h1 {
+  font-family: 'Source Serif 4', serif;
+  font-weight: 600;
+  font-size: clamp(22px, 3vw, 34px);
+  line-height: 1.15;
+  margin: 0;
+  color: var(--text);
+}
+.estaciones-texto .estaciones-sub {
+  font-family: 'Source Serif 4', serif;
+  font-style: italic;
+  font-size: clamp(14px, 1.6vw, 18px);
+  color: var(--text-dim);
+  margin: 0;
+}
+.estaciones-texto .estaciones-cuerpo {
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: clamp(13px, 1.3vw, 16px);
+  line-height: 1.7;
+  color: var(--text);
+  margin: 6px 0 0 0;
+  max-width: 46ch;
+}
+
+/* Pantallas angostas: el texto pasa a ocupar todo el ancho, arriba, sobre
+   el pase de fotos, con un degradado que lo despega de la imagen. */
+@media (max-width: 820px) {
+  .estaciones-texto {
+    inset: 0 0 auto 0;
+    padding: 24px 20px 32px;
+    background: linear-gradient(to bottom, #fefcf4 65%, rgba(254, 252, 244, 0));
+    transform: none;
+    z-index: 2;
+  }
+  .estaciones-cuadro { inset: 0; }
+  /* la foto va a pantalla completa: el rótulo sobre crema deja de tener
+     sentido, así que en angosto no se muestra. */
+  .estaciones-cuadro-pie { display: none; }
 }
 
