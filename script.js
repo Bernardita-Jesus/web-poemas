@@ -737,9 +737,11 @@ const ESTACIONES = {
   invierno: {
     // sentido del degradado por brillo (ver SORT_MODE): oscuro arriba.
     orden: 'brightness-dark',
-    // más recortes deslizándose a la vez que el default (ver
-    // MOSAICO_MAX_ACTIVAS). Subilo/bajalo para más o menos movimiento.
-    mosaicoMax: 120,
+    // cuántos recortes deslizándose a la vez (ver MOSAICO_MAX_ACTIVAS).
+    // Cada uno es un blit de canvas por frame, y el mosaico de invierno es
+    // grande y denso, así que pasarse de acá lo pone lento. Subir con
+    // cuidado; 60 ya es más que el default (64) para un mosaico chico.
+    mosaicoMax: 60,
     // densidad del mosaico: cuántos recortes REALES se sacan de cada foto,
     // como factor sobre el default (1 = 8x16 por foto). 1.25 = ~1.5x más
     // recortes -> mosaico más largo y con más detalle, todos iguales,
