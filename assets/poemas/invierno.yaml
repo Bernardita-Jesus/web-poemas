@@ -161,8 +161,7 @@
 - fecha: 2026-07-31
   fecha_texto: "Viernes 31 de julio, invierno 2026"
   titulo: null
-  fotos:
-    - invierno-09.jpg
+  fotos: []
   texto: |
     Como si lo hubieras escogido,
 
@@ -282,8 +281,7 @@
 - fecha: 2026-08-13
   fecha_texto: "Jueves 13 de agosto, invierno 2026"
   titulo: null
-  fotos:
-    - invierno-09.jpg
+  fotos: []
   texto: |
     Me gustaría envolverme en una arboleda,
 

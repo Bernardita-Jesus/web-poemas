@@ -434,23 +434,22 @@ body {
 }
 
 /* ---------------------------------------------------------------------
-   Velo: capa translúcida por encima del mosaico y por debajo de la capa
-   de texturas y de los poemas (z-index 2). Aclara la imagen dándole un
-   tinte de color. Solo tiñe el mosaico: las fotos de la capa de texturas
-   van por encima y quedan sin tinte.
+   Velo: capa translúcida con tinte de color. z-index 4: se
+   pinta por encima del mosaico Y de la capa de texturas (que también es
+   z-index 4 pero, al ser un hijo del DOM, se pinta antes), así el velo
+   tiñe las dos. Los poemas (z-index 5) quedan por encima, sin teñir.
 
    El color y el modo cambian por estación. script.js pone
    body[data-estacion="..."] (ver CURRENT_SEASON):
-     - otoño   : turquesa, en degradado vertical (más tenue arriba y se
-                 cierra hacia abajo, dejando la parte de arriba más nítida).
-     - invierno: celeste plano al 15% en toda la página.
+     - otoño   : turquesa, en degradado vertical (más tenue arriba).
+     - invierno: celeste, en degradado vertical (más cargado abajo).
    Las estaciones sin regla propia (primavera, verano) quedan sin velo.
 --------------------------------------------------------------------- */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: 2;
+  z-index: 4;
   pointer-events: none;
 }
 /* Otoño: velo turquesa en degradado vertical. */
@@ -462,9 +461,13 @@ body[data-estacion="otono"]::after {
     rgba(206, 242, 230, .25) 100%
   );
 }
-/* Invierno: velo celeste plano al 20% (sin degradado, por ahora). */
+/* Invierno: velo celeste en degradado vertical, de .10 arriba a .30 abajo. */
 body[data-estacion="invierno"]::after {
-  background: rgba(200, 223, 245, .20);
+  background: linear-gradient(
+    to bottom,
+    rgba(200, 223, 245, .10) 0%,
+    rgba(200, 223, 245, .30) 100%
+  );
 }
 
 /* ---------------------------------------------------------------------

@@ -751,7 +751,8 @@ const ESTACIONES = {
     // (1.5, 2...). Ver buildMosaic.
     mosaicoDensidad: 1.25,
     // ajuste fino del largo del mosaico, en filas de recortes (negativo =
-    // más corto). Ver renderFixedMosaic.
+    // más corto; positivo = más largo, con filas de relleno reflejadas).
+    // Ver renderFixedMosaic.
     mosaicoFilasAjuste: -16,
     // cuántas texturas apaisadas se colocan (mínimo; ver construirTexturas)
     texturasCantidad: 23,
@@ -764,9 +765,9 @@ const ESTACIONES = {
       'assets/imagenes/invierno-06.jpg',
       'assets/imagenes/invierno-07.jpg',
       'assets/imagenes/invierno-08.jpg',
-      'assets/imagenes/invierno-09.jpg',
       'assets/imagenes/invierno-10.jpg',
       'assets/imagenes/invierno-11.jpg',
+      'assets/imagenes/invierno-12.jpg',
     ],
     texturas: [
       'assets/imagenes/textura-invierno-01.jpg',
