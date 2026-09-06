@@ -430,7 +430,10 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
   // se traduce en una página más larga en vez de un mosaico más cuadrado.
   const TARGET_WIDTH = 1600;
   const cols = Math.max(1, Math.round(TARGET_WIDTH / tileW));
-  const rows = Math.ceil(n / cols);
+  // Una fila extra al final: se suma una línea entera de recortes debajo de
+  // la última, sin tocar el tamaño de cada recorte. Esas celdas nuevas caen
+  // en i >= n y se rellenan con la misma regla de reflejo que las sobrantes.
+  const rows = Math.ceil(n / cols) + 1;
   const total = rows * cols; // suele ser > n; las celdas sobrantes de la última fila se rellenan reflejando el final del array (ver más abajo)
 
   const holder = document.getElementById('canvas-holder');

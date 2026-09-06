@@ -258,7 +258,14 @@ body {
 
 .poem-card {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* La fila extra del mosaico (ver renderFixedMosaic en script.js, rows + 1)
+     se dibuja pero queda fuera del área donde se reparten los poemas: el
+     borde inferior sube un recorte. Así sumar esa fila no corre los poemas
+     hacia abajo ni agranda los huecos entre ellos. */
+  bottom: var(--barra-alto);
   z-index: 5;
   pointer-events: none;
   display: flex;
