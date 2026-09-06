@@ -65,6 +65,9 @@ body {
   scrollbar-width: thin;
   scrollbar-color: #b3a9d0 #ece8f4;        /* Firefox: pulgar, fondo */
 }
+/* Custom scrollbar mínima: track + pulgar, nada más. Un ::-webkit-scrollbar
+   así NO trae flechitas en Chrome (los botones solo aparecen si se estila
+   ::-webkit-scrollbar-button, cosa que acá NO se hace). */
 .scroll-area::-webkit-scrollbar { width: 12px; }
 .scroll-area::-webkit-scrollbar-track { background: #ece8f4; }
 .scroll-area::-webkit-scrollbar-thumb {
@@ -72,27 +75,8 @@ body {
   border: 3px solid #ece8f4;               /* separa el pulgar del borde del track */
   background-clip: padding-box;
   border-radius: 20px;
-  transition: background-color .2s ease;
 }
 .scroll-area::-webkit-scrollbar-thumb:hover { background: #9f93c2; }
-/* sin flechitas: se cubren TODAS las variantes de botón, a tamaño 0 */
-.scroll-area::-webkit-scrollbar-button,
-.scroll-area::-webkit-scrollbar-button:start,
-.scroll-area::-webkit-scrollbar-button:end,
-.scroll-area::-webkit-scrollbar-button:single-button,
-.scroll-area::-webkit-scrollbar-button:double-button,
-.scroll-area::-webkit-scrollbar-button:vertical:decrement,
-.scroll-area::-webkit-scrollbar-button:vertical:increment,
-.scroll-area::-webkit-scrollbar-button:horizontal:decrement,
-.scroll-area::-webkit-scrollbar-button:horizontal:increment {
-  -webkit-appearance: none;
-  appearance: none;
-  display: none;
-  width: 0;
-  height: 0;
-  background: transparent;
-}
-.scroll-area::-webkit-scrollbar-corner { background: #ece8f4; }
 
 .wrap {
   display: grid;
