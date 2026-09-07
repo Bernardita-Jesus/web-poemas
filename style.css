@@ -596,13 +596,12 @@ body[data-estacion="invierno"]::after {
   transition: filter .15s ease;
 }
 /* un color y una estación por botón */
-.topbar-btn:nth-child(1) { background: #6f6480; } /* Estaciones: morado medio grisáceo */
-.topbar-btn:nth-child(2) { background: #efff5c; } /* Otoño: amarillo flúor un poco más claro */
-.topbar-btn:nth-child(3) { background: #a9dcd2; } /* Invierno: celeste medio verde claro */
-.topbar-btn:nth-child(4) { background: #f0b7cf; } /* Primavera: rosadito */
-.topbar-btn:nth-child(5) { background: #3f72b8; } /* Verano: azul */
+.topbar-btn:nth-child(1) { background: #dedede; color: #000; } /* Estaciones: gris claro, letra negra */
+.topbar-btn:nth-child(2) { background: #6f6480; } /* Otoño: morado medio grisáceo */
+.topbar-btn:nth-child(3) { background: #efff5c; } /* Invierno: amarillo flúor */
+.topbar-btn:nth-child(4) { background: #a9dcd2; } /* Primavera: celeste medio verde claro */
+.topbar-btn:nth-child(5) { background: #273287; } /* Verano: azul */
 /* botones de fondo claro: texto oscuro para que se lea */
-.topbar-btn:nth-child(2),
 .topbar-btn:nth-child(3),
 .topbar-btn:nth-child(4) {
   color: var(--amber-text);
@@ -664,10 +663,20 @@ body.vista-estaciones { background: #fefcf4; }
    espacio (object-fit: cover). */
 .estaciones-cuadro {
   position: absolute;
-  /* arranca en el 40% (pegado al borde del texto) => foto bien ancha. El
-     borde de abajo deja libre --foto-pie para el rótulo "otoño 2026". */
-  inset: 0 0 var(--foto-pie, 4vh) 40%;
-  overflow: hidden;
+  /* Apaisada (aspect-ratio 3/2) y arrancando bien a la izquierda (42%).
+     Se ESCALA con un solo valor —`width`—; el alto sale de la proporción,
+     así no se deforma al achicarla. Centrada en vertical respecto de toda
+     la altura de la pestaña; `max-height` la frena para que nunca pise
+     "Otoño 2026". Bajá `width` para achicarla, subilo para agrandarla;
+     cambiá `aspect-ratio` para más o menos apaisada. */
+  left: 42%;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 53%;
+  aspect-ratio: 3 / 2;
+  max-height: calc(100% - var(--foto-pie, 4vh));
+  /* sin overflow: hidden — las <img> ya calzan justo en la caja (100% +
+     object-fit) y así el rótulo puede colgar por debajo sin recortarse. */
 }
 .estaciones-cuadro img {
   position: absolute;
@@ -685,24 +694,15 @@ body.vista-estaciones { background: #fefcf4; }
   transition: opacity .55s ease;
 }
 .estaciones-cuadro img.visible { opacity: 1; }
-/* Rótulo estación + año ("otoño 2026"): justo debajo de la foto, apegado
-   a su borde inferior, alineado con su esquina izquierda. Cuelga de
-   .estaciones-home (no de .estaciones-cuadro, que recortaría). Ocupa la
-   franja --foto-pie que la foto deja libre abajo. Sin fondo ni sombra:
-   texto sobre el crema de la pestaña. `left` = mismo borde que la foto. */
+/* Rótulo estación + año ("Otoño 2026"): DEBAJO de la foto, alineado con
+   su borde derecho. Cuelga de .estaciones-cuadro (ya no recorta), en
+   `top: 100%`. Sin fondo ni sombra: texto oscuro sobre el crema.
+   `margin-top` lo baja un poco respecto del borde de la foto. */
 .estaciones-cuadro-pie {
   position: absolute;
-  left: 40%;
-  bottom: 0;
-  height: var(--foto-pie, 4vh);
-  display: flex;
-  align-items: flex-start;      /* pegado al pie de la foto */
-  padding-top: 2px;
-  /* nudge respecto de la esquina inferior izquierda de la foto:
-     translate(x, y) — x positivo lo corre a la derecha, y negativo lo
-     sube (se monta sobre la imagen). */
-  transform: translate(200px, -150px);
-  margin: 0;
+  top: 100%;
+  right: 0;
+  margin: 4px 0 0 0;
   font-family: 'IBM Plex Sans', sans-serif;
   font-size: 13px;
   font-weight: 600;
@@ -712,7 +712,53 @@ body.vista-estaciones { background: #fefcf4; }
   transition: opacity .55s ease;
 }
 .estaciones-cuadro-pie.visible { opacity: 1; }
-.estaciones-home img {
+
+/* Flechas del pase de "Poemas y estaciones": FUERA de la foto, una
+   centrada en el hueco de la izquierda (entre el texto y la foto) y otra
+   en el margen de la derecha. Solo el triángulo (◂ ▸), sin línea, sin
+   círculo, sin sombra. Van sobre el crema, por eso color oscuro. Cuelgan
+   de .estaciones-home (fuera de .estaciones-cuadro). `left` en %
+   coordinado con la geometría de .estaciones-cuadro (left 42% / width
+   53%).
+
+   Están ocultas (opacity 0) y solo aparecen al pasar el mouse por la
+   FOTO (o sobre la flecha misma), no por toda la pestaña. El padding
+   grande agranda la zona sensible para que no haya un hueco muerto entre
+   la foto y la flecha. */
+.estaciones-flecha {
+  position: absolute;
+  top: 50%;                 /* centradas en la altura, igual que la foto */
+  /* grandes y estiradas a lo alto: scaleY alarga el triángulo (más alto
+     que ancho). */
+  transform: translate(-50%, -50%) scaleY(1.6);
+  z-index: 4;
+  padding: 16px 22px;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 52px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .25s ease, color .15s ease;
+}
+.estaciones-cuadro:hover ~ .estaciones-flecha { opacity: .7; }
+.estaciones-flecha:hover,
+.estaciones-flecha:focus-visible {
+  opacity: 1;
+  color: var(--text);
+  outline: none;
+}
+/* Misma distancia a cada lado: el centro de cada flecha queda 1,5% (del
+   ancho) por fuera del borde de la foto (izq. 42%, der. 95%). */
+.estaciones-flecha--prev { left: 40.5%; }
+.estaciones-flecha--next { left: 96.5%; }
+/* Solo las fotos SUELTAS de la grilla vieja (hijas directas de
+   .estaciones-home). El `>` deja fuera a las del pase (.estaciones-cuadro
+   img), que si no heredaban este max-width/max-height y quedaban chicas
+   arriba a la izquierda en vez de llenar su caja. */
+.estaciones-home > img {
   display: block;
   width: 100%;
   height: 100%;
@@ -730,7 +776,7 @@ body.vista-estaciones { background: #fefcf4; }
    la grilla de .estaciones-home. */
 .estaciones-texto {
   position: absolute;
-  inset: 0 60% 0 0;
+  inset: 0 62% 0 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -774,9 +820,25 @@ body.vista-estaciones { background: #fefcf4; }
     transform: none;
     z-index: 2;
   }
-  .estaciones-cuadro { inset: 0; }
+  .estaciones-cuadro {
+    inset: 0;
+    width: auto;
+    aspect-ratio: auto;
+    max-height: none;
+    transform: none;
+  }
   /* la foto va a pantalla completa: el rótulo sobre crema deja de tener
      sentido, así que en angosto no se muestra. */
   .estaciones-cuadro-pie { display: none; }
+  /* flechas a los bordes, sobre la foto: blancas y siempre visibles
+     (en táctil no hay hover). */
+  .estaciones-flecha {
+    top: 50%;
+    color: #fff;
+    opacity: .85;
+    transform: translate(-50%, -50%) scaleY(1.6);
+  }
+  .estaciones-flecha--prev { left: 26px; }
+  .estaciones-flecha--next { left: auto; right: 26px; }
 }
 

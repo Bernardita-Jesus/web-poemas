@@ -1828,18 +1828,20 @@ function renderFlowMosaic(tiles, rowHeight, minWidth, maxWidth, onDone) {
 // pasa las MISMAS fotos que usan los mosaicos —juntando las de todas las
 // estaciones (ESTACIONES.<x>.fotos)— de a UNA, cambiando cada
 // ESTACIONES_FOTO_MS con un fundido cruzado (dos capas <img>). Debajo de
-// cada foto, un rótulo con su estación y año ("otoño 2026" / "invierno
-// 2026"), que sale de ESTACIONES.<x>.nombre y .anio. Solo corre en la
-// pestaña de entrada (sin estación elegida).
+// cada foto, un rótulo con su estación y año ("Otoño 2026" / "Invierno
+// 2026"), que sale de ESTACIONES.<x>.nombre y .anio. A los lados hay dos
+// flechas para retroceder / avanzar a mano; cada clic reinicia la cuenta
+// del pase automático. Solo corre en la pestaña de entrada (sin estación
+// elegida).
 // =====================================================================
-const ESTACIONES_FOTO_MS = 6500;
+const ESTACIONES_FOTO_MS = 5000;
 (function () {
   if (CURRENT_SEASON) return;
   const cuadro = document.querySelector('.estaciones-cuadro');
   if (!cuadro) return;
 
   // Cada entrada: la ruta de la foto y el rótulo de su estación, para
-  // poder escribir "otoño 2026" / "invierno 2026" debajo.
+  // poder escribir "Otoño 2026" / "Invierno 2026" debajo.
   const items = [];
   Object.keys(ESTACIONES).forEach(key => {
     const cfg = ESTACIONES[key];
@@ -1856,12 +1858,11 @@ const ESTACIONES_FOTO_MS = 6500;
   cuadro.appendChild(a);
   cuadro.appendChild(b);
 
-  // rótulo con la estación y el año de la foto visible: va JUSTO DEBAJO
-  // de la foto, así que cuelga de .estaciones-home (el .estaciones-cuadro
-  // recorta lo que se sale de su caja).
+  // rótulo con la estación y el año de la foto visible: pegado a la
+  // esquina inferior derecha de la foto (dentro de .estaciones-cuadro).
   const pie = document.createElement('div');
   pie.className = 'estaciones-cuadro-pie';
-  (cuadro.parentElement || cuadro).appendChild(pie);
+  cuadro.appendChild(pie);
 
   let i = 0;
   let visible = a, oculta = b;
@@ -1870,12 +1871,18 @@ const ESTACIONES_FOTO_MS = 6500;
   pie.textContent = items[0].etiqueta;
   pie.classList.add('visible');
 
-  if (items.length < 2 || prefersReducedMotion) return; // una sola foto: sin rotación
-
-  setInterval(() => {
-    i = (i + 1) % items.length;
+  // Muestra la foto `nuevo` (con vuelta: -1 => la última). Precarga la
+  // imagen y recién ahí hace el fundido cruzado. `pedido` descarta las
+  // cargas que quedaron viejas si se aprietan las flechas rápido.
+  let pedido = 0;
+  function mostrar(nuevo) {
+    nuevo = (nuevo % items.length + items.length) % items.length;
+    if (nuevo === i) return;
+    i = nuevo;
+    const req = ++pedido;
     const pre = new Image();
     pre.onload = () => {
+      if (req !== pedido) return;           // llegó primero una foto más nueva
       oculta.src = items[i].ruta;           // ya cacheada: sin parpadeo
       oculta.classList.add('visible');
       visible.classList.remove('visible');
@@ -1883,7 +1890,41 @@ const ESTACIONES_FOTO_MS = 6500;
       pie.textContent = items[i].etiqueta;
     };
     pre.src = items[i].ruta;
-  }, ESTACIONES_FOTO_MS);
+  }
+
+  // Pase automático: cada ESTACIONES_FOTO_MS avanza una foto. Se
+  // (re)programa al arrancar y después de cada flecha, así un clic manual
+  // no queda seguido de un salto inmediato. Con una sola foto, o si el
+  // sistema pide menos movimiento, no hay pase automático (las flechas
+  // igual andan).
+  let timer = null;
+  function programar() {
+    if (timer) clearInterval(timer);
+    timer = null;
+    if (items.length < 2 || prefersReducedMotion) return;
+    timer = setInterval(() => mostrar(i + 1), ESTACIONES_FOTO_MS);
+  }
+
+  // Flechas a ambos lados de la foto para retroceder / avanzar a mano.
+  if (items.length >= 2) {
+    const flechaPrev = document.createElement('button');
+    const flechaNext = document.createElement('button');
+    flechaPrev.type = flechaNext.type = 'button';
+    flechaPrev.className = 'estaciones-flecha estaciones-flecha--prev';
+    flechaNext.className = 'estaciones-flecha estaciones-flecha--next';
+    flechaPrev.setAttribute('aria-label', 'Foto anterior');
+    flechaNext.setAttribute('aria-label', 'Foto siguiente');
+    flechaPrev.textContent = '◂';
+    flechaNext.textContent = '▸';
+    // fuera de .estaciones-cuadro (tiene overflow:hidden y las recortaría)
+    const cont = cuadro.parentElement || cuadro;
+    cont.appendChild(flechaPrev);
+    cont.appendChild(flechaNext);
+    flechaPrev.addEventListener('click', () => { mostrar(i - 1); programar(); });
+    flechaNext.addEventListener('click', () => { mostrar(i + 1); programar(); });
+  }
+
+  programar();
 })();
 
 // =====================================================================
