@@ -454,7 +454,16 @@ body {
 body::after {
   content: "";
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  /* alto explícito con dvh (no "inset:0" + el bottom implícito): en
+     celulares algunos navegadores miden un position:fixed con inset:0
+     contra el viewport "grande" (como si la barra de direcciones
+     estuviera siempre oculta), dejando un resto de mosaico sin teñir
+     abajo cuando la barra se muestra. dvh sigue el viewport visible real,
+     igual que ya hace el body (ver más arriba). */
+  height: 100dvh;
   z-index: 4;
   pointer-events: none;
 }

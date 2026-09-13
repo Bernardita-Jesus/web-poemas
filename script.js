@@ -1422,13 +1422,15 @@ const TEXTURAS_IMAGE_PATHS = SEASON_CFG.texturas;
 const TEXTURAS_CICLO_MS = 24000;
 
 // Ajuste fino vertical de TODAS las texturas, en píxeles. 0 = sobre la
-// línea de la grilla del mosaico. Negativo = suben; positivo = bajan.
-// Quedaban sistemáticamente un poquito por debajo de los recortes, así
-// que se las sube unos px. Si todavía no calzan, movés este número:
-// más negativo = más arriba; hacia 0 = más abajo.
-const TEXTURAS_AJUSTE_PX = -1.35;
+// línea de la grilla del mosaico. Negativo = suben; positivo = bajan. Si
+// no calzan, movés este número: más negativo = más arriba; hacia 0 (o
+// positivo) = más abajo.
+const TEXTURAS_AJUSTE_PX = -0.5;
 
 const texturaCapa = document.getElementById('texturaCapa');
+// Limpia los listeners/animación del desliz anterior antes de rearmar la
+// capa (ver reconstruirTexturas). La setea iniciarDeslizScroll/Constante.
+let texturasCleanup = null;
 
 // Fisher-Yates: mezcla el array en el lugar.
 function barajar(a) {
@@ -1634,6 +1636,28 @@ function construirTexturas() {
   requestAnimationFrame(() => texturaCapa.classList.add('lista'));
 }
 
+// Si la ventana cambia de tamaño (se achica/agranda el navegador, se rota
+// el celular) DESPUÉS de armada la capa, --col y el top de cada foto
+// quedaban congelados en el tamaño viejo: el mosaico de fondo se reescala
+// solo (es 100% responsive) pero las texturas no, así que se veían más
+// grandes (o desalineadas) que el mosaico ya achicado. Por eso, ante un
+// resize, se tira toda la capa y se rearma de cero con las medidas
+// nuevas (fotos y posiciones quedan random de nuevo, como en una carga
+// normal). Debounced: espera a que el resize se asiente.
+let texturasResizeTimer = null;
+function reconstruirTexturas() {
+  if (texturasCleanup) { texturasCleanup(); texturasCleanup = null; }
+  texturaCapa.classList.remove('lista');
+  texturaCapa.innerHTML = '';
+  construirTexturas._anchoPrevio = undefined;
+  construirTexturas();
+}
+window.addEventListener('resize', () => {
+  if (!EFECTO_TEXTURAS || !texturaCapa || !texturaCapa.children.length) return;
+  clearTimeout(texturasResizeTimer);
+  texturasResizeTimer = setTimeout(reconstruirTexturas, 250);
+}, { passive: true });
+
 // efecto texturas: coloca una foto en el punto `p` (0..1) de su cruce de
 // lado a lado. p = 0 → fuera de la pantalla por un costado; p = 1 → fuera
 // por el opuesto; p = 0,5 → centrada. Hacia qué lado cruza lo decide
@@ -1666,6 +1690,7 @@ function iniciarDeslizConstante() {
   }
 
   const inicio = performance.now();
+  let raf = 0;
   function frame(ahora) {
     const anchoCapa = texturaCapa.clientWidth || window.innerWidth;
     const transcurrido = ahora - inicio;
@@ -1677,9 +1702,10 @@ function iniciarDeslizConstante() {
       if (p < 0) p += 1;
       colocarCruce(slide, p, anchoCapa);
     });
-    requestAnimationFrame(frame);
+    raf = requestAnimationFrame(frame);
   }
-  requestAnimationFrame(frame);
+  raf = requestAnimationFrame(frame);
+  texturasCleanup = () => cancelAnimationFrame(raf);
 }
 
 // efecto texturas, modo 'scroll': el `p` de cada foto sale de qué tan
@@ -1730,6 +1756,11 @@ function iniciarDeslizScroll() {
   scroller.addEventListener('scroll', alScroll, { passive: true });
   window.addEventListener('resize', alScroll, { passive: true });
   actualizar();
+
+  texturasCleanup = () => {
+    scroller.removeEventListener('scroll', alScroll);
+    window.removeEventListener('resize', alScroll);
+  };
 }
 
 // La capa de texturas se arma desde markMosaicReady(), no acá: hay que
