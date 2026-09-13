@@ -720,7 +720,9 @@ const ESTACIONES = {
     // cuántas texturas apaisadas se colocan (mínimo; ver construirTexturas)
     texturasCantidad: 16,
     fotos: [
+      'assets/imagenes/otono-03.jpg',
       'assets/imagenes/otono-04.jpg',
+      'assets/imagenes/otono-05.jpg',
       'assets/imagenes/otono-07.jpg',
       'assets/imagenes/otono-08.jpg',
       'assets/imagenes/otono-09.jpg',
@@ -1452,6 +1454,20 @@ function construirTexturas() {
     return;
   }
 
+  // Ya con canvas y alto: falta que su ANCHO en pantalla esté asentado.
+  // Recién pintado puede quedar un reflow más (fuentes, barra que
+  // termina de acomodarse), y --col sale de ese ancho: si se mide
+  // demasiado pronto, las texturas quedan chicas para siempre (esto
+  // corre una sola vez). Se confirma comparando con la medición anterior:
+  // si cambió, se reintenta; recién con dos iguales seguidas se sigue.
+  const anchoActual = canvasEl.getBoundingClientRect().width;
+  if (anchoActual !== construirTexturas._anchoPrevio) {
+    construirTexturas._anchoPrevio = anchoActual;
+    setTimeout(construirTexturas, 150);
+    return;
+  }
+  construirTexturas._anchoPrevio = undefined;
+
   // Medidas fijas de cada rectángulo, en cuadrados de la grilla:
   //   alto  = 2 cuadrados (recortes del mosaico). Cada recorte mide
   //           --col/2 de alto, así que 2 recortes = --col * 1.
@@ -1819,6 +1835,38 @@ function renderFlowMosaic(tiles, rowHeight, minWidth, maxWidth, onDone) {
       irA(btn.dataset.accion === 'intro' ? null : btn.dataset.season);
     });
   });
+})();
+
+// =====================================================================
+// EFECTO BARRA
+// ---------------------------------------------------------------------
+// Al scrollear para abajo dentro de .scroll-area (la única caja que
+// scrollea, ver style.css), la barra de botones sube y se esconde, así
+// el mosaico y los poemas ganan toda la pantalla; al scrollear para
+// arriba —o al llegar arriba del todo— vuelve a bajar. La sube/baja pone
+// o saca .topbar--oculta, que anima el margin-top en style.css.
+// =====================================================================
+const EFECTO_BARRA = true;
+(function () {
+  if (!EFECTO_BARRA || prefersReducedMotion) return;
+  const barra = document.getElementById('topbar');
+  const area = document.querySelector('.scroll-area');
+  if (!barra || !area) return;
+
+  const UMBRAL_ARRIBA = 8; // px: cerca del tope, la barra siempre se ve
+  let ultimoScroll = area.scrollTop;
+
+  area.addEventListener('scroll', () => {
+    const actual = area.scrollTop;
+    if (actual <= UMBRAL_ARRIBA) {
+      barra.classList.remove('topbar--oculta');
+    } else if (actual > ultimoScroll) {
+      barra.classList.add('topbar--oculta');       // bajando: se esconde
+    } else if (actual < ultimoScroll) {
+      barra.classList.remove('topbar--oculta');     // subiendo: vuelve
+    }
+    ultimoScroll = actual;
+  }, { passive: true });
 })();
 
 // =====================================================================

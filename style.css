@@ -565,14 +565,25 @@ body[data-estacion="invierno"]::after {
    más abajo). Cambiá esos valores para otra paleta.
 --------------------------------------------------------------------- */
 .topbar {
-  position: sticky;
-  top: 0;
+  /* antes "sticky", pero body no scrollea (.scroll-area es la única caja
+     que lo hace) así que ese sticky no hacía nada salvo, según
+     descubrimos, clavar la barra en top:0 y anular el margin-top negativo
+     del efecto barra de más abajo. Con "relative" ese margin sí la mueve. */
+  position: relative;
   z-index: 20;
   display: flex;
   /* hilito de separación abajo: 0.5px (medio píxel en retina) y muy poca
      opacidad, para que se lea lo más fino posible. En pantallas no-retina
      queda en 1px pero, al ser tan tenue, parece más delgado. */
   border-bottom: 0.5px solid rgba(240, 227, 173, .16);
+  /* efecto barra (ver script.js): al scrollear para abajo se le suma
+     margin-top negativo -uno de sus propios altos-, así se corre hacia
+     arriba y sale del flujo; .scroll-area (flex: 1) crece sola para
+     ocupar el espacio que deja libre. */
+  transition: margin-top .5s cubic-bezier(.22, 1, .36, 1);
+}
+.topbar.topbar--oculta {
+  margin-top: calc(var(--barra-alto) * -1);
 }
 .topbar-btn {
   flex: 1 1 0;
