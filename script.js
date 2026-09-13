@@ -720,15 +720,15 @@ const ESTACIONES = {
     // cuántas texturas apaisadas se colocan (mínimo; ver construirTexturas)
     texturasCantidad: 16,
     fotos: [
+      'assets/imagenes/otono-01.jpg',
+      'assets/imagenes/otono-02.jpg',
       'assets/imagenes/otono-03.jpg',
       'assets/imagenes/otono-04.jpg',
       'assets/imagenes/otono-05.jpg',
-      'assets/imagenes/otono-07.jpg',
-      'assets/imagenes/otono-08.jpg',
-      'assets/imagenes/otono-09.jpg',
-      'assets/imagenes/otono-10.jpeg',
-      'assets/imagenes/otono-11.jpeg',
-      'assets/imagenes/otono-12.jpeg',
+      'assets/imagenes/otono-06.jpg',
+      'assets/imagenes/otono-07.jpeg',
+      'assets/imagenes/otono-08.jpeg',
+      'assets/imagenes/otono-09.jpeg',
     ],
     texturas: [
       'assets/imagenes/textura-otono-01.jpeg',
@@ -775,9 +775,9 @@ const ESTACIONES = {
       'assets/imagenes/invierno-06.jpg',
       'assets/imagenes/invierno-07.jpg',
       'assets/imagenes/invierno-08.jpg',
+      'assets/imagenes/invierno-09.jpg',
       'assets/imagenes/invierno-10.jpg',
       'assets/imagenes/invierno-11.jpg',
-      'assets/imagenes/invierno-12.jpg',
     ],
     texturas: [
       'assets/imagenes/textura-invierno-01.jpg',
