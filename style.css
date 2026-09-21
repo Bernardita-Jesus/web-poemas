@@ -65,6 +65,10 @@ body {
      texto no salta al bajar. Los poemas se excluyen del anclaje (abajo)
      para que su animación de entrada no dispare ese salto. */
   overflow-anchor: auto;
+  /* scroll con inercia nativa en iOS: sin esto, un contenedor con su
+     propio overflow (no el body) puede sentirse "pegajoso"/entrecortado
+     al arrastrar con el dedo en vez de deslizar suave. */
+  -webkit-overflow-scrolling: touch;
 }
 .vista-estaciones .scroll-area { overflow: hidden; }   /* estaciones: sin scroll */
 
@@ -933,6 +937,18 @@ body.vista-estaciones { background: #fefcf4; }
   }
   .vista-estaciones .scroll-area {
     overflow-y: auto;            /* red de seguridad: nunca se corta contenido */
+  }
+  /* La regla base esconde la barra de scroll propia en "Estaciones"
+     (pensada para desktop, donde ahí nunca hace falta scrollear). En
+     mobile SÍ puede hacer falta (ver overflow-y:auto arriba), así que
+     acá se vuelve a mostrar -pero respetando el atributo `hidden`: el
+     propio JS (#cscroll, "BARRA DE SCROLL PROPIA") se lo pone/saca
+     según si hay algo para scrollear o no. */
+  .vista-estaciones .cscroll {
+    display: block;
+  }
+  .vista-estaciones .cscroll[hidden] {
+    display: none;
   }
   /* .estaciones-home es display:grid (pensado para la grilla vieja de
      fotos sueltas, .estaciones-home > img); acá se pisa a flex column
