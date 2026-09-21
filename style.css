@@ -7,13 +7,27 @@
   --amber-text: #4a3c12;
   --text: #4a3f28;
   --text-dim: #96895f;
-  /* Alto de la barra superior = alto de un recorte del mosaico. El
-     canvas se reparte en 13 columnas y cada recorte mide media columna
-     de alto (tileW 120 : tileH 60 en index.html). Lo usa el alto de los
-     botones (.topbar-btn) y, de rebote, el .stage (le descuenta este
-     alto a su min-height). La barra ocupa su lugar en el flujo, así que
-     el mosaico ya arranca solo debajo de los botones. */
+  /* Alto de UNA fila de la barra superior = alto de un recorte del
+     mosaico. El canvas se reparte en 13 columnas y cada recorte mide
+     media columna de alto (tileW 120 : tileH 60 en index.html). Lo usa
+     el alto de los botones (.topbar-btn) y .poem-card (bottom, para
+     dejar afuera la fila extra del mosaico -no tiene que ver con la
+     barra, es la misma medida por coincidencia). */
   --barra-alto: calc(100vw / 13 / 2);
+  /* Alto real de una fila de LA BARRA (.topbar-btn). En desktop es el
+     mismo --barra-alto (coincide con la grilla del mosaico); en
+     pantallas angostas se pisa con un valor fijo más cómodo para tocar
+     (ver @media más abajo), porque ahí --barra-alto da filas de apenas
+     ~15px. */
+  --topbar-fila-alto: var(--barra-alto);
+  /* Cuántas filas ocupa la barra de botones: 1 en desktop, 3 en
+     pantallas angostas (ver @media más abajo, la barra pasa a 2
+     filas: "Poemas y estaciones" sola arriba, las 4 estaciones de a
+     dos abajo). .stage, #cscroll y el efecto barra (script.js) usan
+     --topbar-alto (fila-alto * esta variable) para saber cuánto lugar
+     ocupa la barra completa, no una sola fila. */
+  --topbar-filas: 1;
+  --topbar-alto: calc(var(--topbar-fila-alto) * var(--topbar-filas));
 }
 
 * { box-sizing: border-box; }
@@ -67,30 +81,31 @@ body {
 
 .cscroll {
   position: fixed;
-  top: var(--barra-alto);        /* arranca justo debajo de los botones */
+  top: var(--topbar-alto);       /* arranca justo debajo de los botones */
   right: 0;
   bottom: 0;
   width: 12px;
   z-index: 15;                    /* sobre el contenido, debajo de la barra (20) */
-  /* tonos neutros de la paleta: el carril, un poco más oscuro que el
-     fondo de "Estaciones" (#fefcf4) */
-  background: #f1e9d2;            /* fondo de la barra */
+  /* sin carril visible: solo se ve el pulgar (.cscroll-thumb) al
+     moverse. Esta caja sigue siendo la zona clickeable/arrastrable
+     (ancho 12px), simplemente ya no tiene fondo propio. */
+  background: none;
 }
 .cscroll-thumb {
   position: absolute;
   top: 0;
-  right: 0;
-  width: 12px;
+  right: 4px;
+  /* una línea angosta en vez del rectángulo redondeado de antes */
+  width: 4px;
   min-height: 24px;
-  border: 3px solid #f1e9d2;      /* separa el pulgar del borde del carril */
-  background: #d7c9a3;            /* el rectángulo redondeado */
-  background-clip: padding-box;
-  border-radius: 20px;
+  border: 0;
+  background: rgba(215, 201, 163, .5);
+  border-radius: 4px;
   cursor: grab;
   transition: background-color .15s ease;
 }
-.cscroll-thumb:hover { background: #c8b98d; }
-.cscroll-thumb.drag { background: #c8b98d; cursor: grabbing; }
+.cscroll-thumb:hover { background: rgba(200, 185, 143, .75); }
+.cscroll-thumb.drag { background: rgba(200, 185, 143, .75); cursor: grabbing; }
 /* en "Estaciones" no hay scroll: la barra propia no se muestra */
 .vista-estaciones .cscroll { display: none; }
 
@@ -275,7 +290,7 @@ button.secondary:disabled {
 .stage {
   padding: 0;
   /* descuenta el alto de la barra superior, que ya ocupa lugar arriba */
-  min-height: calc(100vh - var(--barra-alto));
+  min-height: calc(100vh - var(--topbar-alto));
 }
 #canvas-holder {
   box-shadow: none;
@@ -592,13 +607,14 @@ body[data-estacion="invierno"]::after {
   transition: margin-top .5s cubic-bezier(.22, 1, .36, 1);
 }
 .topbar.topbar--oculta {
-  margin-top: calc(var(--barra-alto) * -1);
+  margin-top: calc(var(--topbar-alto) * -1);
 }
 .topbar-btn {
   flex: 1 1 0;
   min-width: 0;
-  /* alto de un recorte del mosaico */
-  height: var(--barra-alto);
+  /* alto de un recorte del mosaico en desktop; en pantallas angostas
+     un valor fijo más cómodo (ver --topbar-fila-alto en :root) */
+  height: var(--topbar-fila-alto);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -636,6 +652,36 @@ body[data-estacion="invierno"]::after {
 .topbar-btn.is-active {
   font-weight: 700;
   box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .35);
+}
+
+/* Pantallas angostas: los 5 botones en una sola fila quedan ilegibles
+   (muy angostos). La barra pasa a grid de 2 columnas: "Poemas y
+   estaciones" (1er botón) ocupa toda la fila de arriba, y las 4
+   estaciones se acomodan de a dos abajo -otoño/invierno una fila,
+   primavera/verano la siguiente-. --topbar-filas pasa a 3 (ver :root)
+   para que --topbar-alto (usado por .stage, #cscroll y el efecto
+   barra de script.js) sepa cuánto lugar ocupa la barra entera ahora,
+   no solo una fila. --topbar-fila-alto también se pisa: en desktop
+   coincide con un recorte del mosaico (--barra-alto), pero acá eso da
+   filas de apenas ~15px, muy finas para tocar; 44px es el mínimo
+   recomendado de tap target (iOS/Android). */
+@media (max-width: 820px) {
+  :root {
+    /* el mosaico de fondo pasa a 6 columnas acá (ver script.js, tileW/
+       tileH de los sliders), no 13: --barra-alto tiene que seguir
+       midiendo un recorte real para que .poem-card (bottom) no quede
+       desalineado. */
+    --barra-alto: calc(100vw / 6 / 2);
+    --topbar-filas: 3;
+    --topbar-fila-alto: 44px;
+  }
+  .topbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .topbar-btn:nth-child(1) {
+    grid-column: 1 / -1;
+  }
 }
 
 /* ---------------------------------------------------------------------
@@ -733,47 +779,65 @@ body.vista-estaciones { background: #fefcf4; }
 }
 .estaciones-cuadro-pie.visible { opacity: 1; }
 
-/* Flechas del pase de "Poemas y estaciones": FUERA de la foto, una
-   centrada en el hueco de la izquierda (entre el texto y la foto) y otra
-   en el margen de la derecha. Solo el triángulo (◂ ▸), sin línea, sin
-   círculo, sin sombra. Van sobre el crema, por eso color oscuro. Cuelgan
-   de .estaciones-home (fuera de .estaciones-cuadro). `left` en %
-   coordinado con la geometría de .estaciones-cuadro (left 42% / width
-   53%).
+/* Flechas del pase de "Poemas y estaciones": hijas de .estaciones-cuadro
+   (las agrega ahí script.js, que no tiene overflow:hidden), así quedan
+   anclaas a la caja de fotos de verdad en cualquier tamaño de pantalla,
+   sin depender de un cálculo aparte contra .estaciones-home -que se
+   desalineaba según cuánto sobrara de alto libre alrededor del texto.
+   En desktop quedan JUSTO AFUERA de la foto, tocando el borde (el
+   padding grande del botón hace de "hueco muerto" para que no haya
+   salto entre la foto y la flecha, ver `transform` en cada lado más
+   abajo); en celular, adentro, sobre la foto (ver @media más abajo).
 
    Están ocultas (opacity 0) y solo aparecen al pasar el mouse por la
-   FOTO (o sobre la flecha misma), no por toda la pestaña. El padding
-   grande agranda la zona sensible para que no haya un hueco muerto entre
-   la foto y la flecha. */
+   FOTO (o sobre la flecha misma), no por toda la pestaña.
+
+   El triángulo NO es un carácter Unicode (◂ ▸): esos dos gliphs no
+   existen en 'IBM Plex Sans', así que cada navegador los reemplazaba
+   por una fuente de repuesto distinta -a veces ni siquiera la misma
+   para los dos, y salían de tamaños distintos entre sí (ver
+   .estaciones-flecha::before). El botón en sí queda sin contenido,
+   solo de hit-area (por eso el padding grande) y centra ese triángulo
+   con flex. */
 .estaciones-flecha {
   position: absolute;
   top: 50%;                 /* centradas en la altura, igual que la foto */
-  /* grandes y estiradas a lo alto: scaleY alarga el triángulo (más alto
-     que ancho). */
-  transform: translate(-50%, -50%) scaleY(1.6);
   z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 16px 22px;
   border: 0;
   background: none;
   color: var(--text-dim);
-  font-family: 'IBM Plex Sans', sans-serif;
-  font-size: 52px;
-  line-height: 1;
   cursor: pointer;
   opacity: 0;
   transition: opacity .25s ease, color .15s ease;
 }
-.estaciones-cuadro:hover ~ .estaciones-flecha { opacity: .7; }
+.estaciones-cuadro:hover .estaciones-flecha { opacity: .7; }
 .estaciones-flecha:hover,
 .estaciones-flecha:focus-visible {
   opacity: 1;
   color: var(--text);
   outline: none;
 }
-/* Misma distancia a cada lado: el centro de cada flecha queda 1,5% (del
-   ancho) por fuera del borde de la foto (izq. 42%, der. 95%). */
-.estaciones-flecha--prev { left: 40.5%; }
-.estaciones-flecha--next { left: 96.5%; }
+/* el triángulo de verdad: un rectángulo recortado con clip-path, más
+   alto que ancho. currentColor lo pinta con el `color` del botón (así
+   el hover de arriba también le cambia el color). */
+.estaciones-flecha::before {
+  content: "";
+  display: block;
+  width: 20px;
+  height: 32px;
+  background: currentColor;
+}
+.estaciones-flecha--prev::before { clip-path: polygon(100% 0%, 0% 50%, 100% 100%); }
+.estaciones-flecha--next::before { clip-path: polygon(0% 0%, 100% 50%, 0% 100%); }
+/* pegadas al borde de la foto por afuera: translate al 100% de su
+   propio ancho (del botón entero, hit-area incluida) las corre hacia
+   el lado que corresponde. */
+.estaciones-flecha--prev { left: 0; transform: translate(-100%, -50%); }
+.estaciones-flecha--next { left: auto; right: 0; transform: translate(100%, -50%); }
 /* Solo las fotos SUELTAS de la grilla vieja (hijas directas de
    .estaciones-home). El `>` deja fuera a las del pase (.estaciones-cuadro
    img), que si no heredaban este max-width/max-height y quedaban chicas
@@ -830,35 +894,108 @@ body.vista-estaciones { background: #fefcf4; }
   max-width: 46ch;
 }
 
-/* Pantallas angostas: el texto pasa a ocupar todo el ancho, arriba, sobre
-   el pase de fotos, con un degradado que lo despega de la imagen. */
+/* Crédito, pegado abajo de todo en la pestaña "Estaciones". Absoluto
+   respecto de .estaciones-home (position: relative), así funciona igual
+   en desktop (grid + hijos absolutos, altura fija a la pantalla) y en
+   celular (flex column, puede scrollear si el contenido no entra: ver
+   @media más abajo -ahí queda al fondo del área scrolleable). */
+.estaciones-creditos {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 10px;
+  margin: 0;
+  text-align: center;
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 12px;
+  letter-spacing: .02em;
+  color: var(--text-dim);
+}
+
+/* Pantallas angostas: antes la foto ocupaba TODA la pantalla (pasaba a
+   pantalla completa, texto arriba con degradado encima). Ahora en vez de
+   eso es un cuadrado chico y contenido, como en desktop pero cuadrado,
+   para que nunca se salga de la pantalla: el texto arriba en su propio
+   bloque (fondo sólido, sin superponerse), el cuadrado centrado debajo.
+   --cuadro-mobile fija el tamaño una sola vez y lo reusan el cuadrado y
+   las flechas (para no duplicar el cálculo). Si el contenido de texto
+   fuera muy largo en un teléfono muy bajo, .scroll-area pasa a scrollear
+   acá (ver más abajo) en vez de recortar o desbordar. */
 @media (max-width: 820px) {
+  :root {
+    /* ancho de la caja de fotos; el alto sale de aspect-ratio en
+       .estaciones-cuadro (3/2, apaisada, igual que en desktop). */
+    --cuadro-mobile: min(88vw, 360px);
+    /* espacio libre bajo la caja: lo usan tanto el padding-bottom de
+       .estaciones-home como el cálculo de las flechas, tiene que ser el
+       mismo número en los dos lugares. */
+    --cuadro-mobile-margen: 32px;
+  }
+  .vista-estaciones .scroll-area {
+    overflow-y: auto;            /* red de seguridad: nunca se corta contenido */
+  }
+  /* .estaciones-home es display:grid (pensado para la grilla vieja de
+     fotos sueltas, .estaciones-home > img); acá se pisa a flex column
+     así el texto y el cuadrado se apilan en flujo normal -alto real,
+     sin repartirse en filas de 1fr como haría la grilla con hijos ya
+     no-absolutos. */
+  .vista-estaciones .estaciones-home {
+    display: flex;
+    flex-direction: column;
+    /* la base trae justify-content: center (pensado para el grid de
+       fotos sueltas): en flex column centraba todo el bloque en vertical
+       -mismo efecto que un padding-top gigante invisible-, así que se
+       pisa a flex-start para que arranque pegado arriba. */
+    justify-content: flex-start;
+    padding-top: 0;
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+    padding-bottom: var(--cuadro-mobile-margen);
+  }
   .estaciones-texto {
-    inset: 0 0 auto 0;
-    padding: 24px 20px 32px;
-    background: linear-gradient(to bottom, #fefcf4 65%, rgba(254, 252, 244, 0));
+    position: relative;
+    inset: auto;
+    /* casi sin padding arriba (era 24px, después 8px): sube todo el
+       bloque -título, texto y la caja de fotos que sigue en flujo-
+       bien cerca de la barra, con un respiro chico para que no la
+       toque (los botones quedan igual, son otro elemento). */
+    padding: 20px 20px 12px;
+    background: none;
     transform: none;
     z-index: 2;
   }
   .estaciones-cuadro {
-    inset: 0;
-    width: auto;
-    aspect-ratio: auto;
+    position: relative;
+    inset: auto;
+    left: auto;
+    top: auto;
+    align-self: center;          /* centrado horizontal; .estaciones-texto ocupa el ancho entero (align-items: stretch, default) */
+    margin: 8px 0 0;
+    width: var(--cuadro-mobile);
+    aspect-ratio: 3 / 2;
     max-height: none;
     transform: none;
   }
-  /* la foto va a pantalla completa: el rótulo sobre crema deja de tener
-     sentido, así que en angosto no se muestra. */
-  .estaciones-cuadro-pie { display: none; }
-  /* flechas a los bordes, sobre la foto: blancas y siempre visibles
-     (en táctil no hay hover). */
+  .estaciones-cuadro-pie {
+    /* con la caja chica vuelve a tener sentido (se había ocultado
+       cuando la foto pasaba a pantalla completa) */
+    position: absolute;
+    top: 100%;
+    right: 0;
+  }
+  /* flechas SOBRE la foto (no afuera, a los costados: en un celular
+     angosto no queda margen fuera de la caja para un botón de ese
+     ancho). Blancas, como antes cuando la foto ocupaba toda la
+     pantalla. Al ser hijas de .estaciones-cuadro (ver script.js),
+     top:50% + translateY(-50%) las centra contra el alto real de la
+     caja sin ningún cálculo aparte. */
   .estaciones-flecha {
-    top: 50%;
+    padding: 10px;
     color: #fff;
     opacity: .85;
-    transform: translate(-50%, -50%) scaleY(1.6);
   }
-  .estaciones-flecha--prev { left: 26px; }
-  .estaciones-flecha--next { left: auto; right: 26px; }
+  .estaciones-flecha--prev { left: 8px; transform: translate(0, -50%); }
+  .estaciones-flecha--next { left: auto; right: 8px; transform: translate(0, -50%); }
 }
 

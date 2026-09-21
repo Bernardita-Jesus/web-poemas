@@ -898,6 +898,35 @@ function loadAssetBackground() {
   for (let i = 0; i < enParalelo; i++) arrancarUna();
 }
 
+// En pantallas angostas, el mosaico se arma con 6 columnas en vez de 13:
+// cada recorte queda bastante más grande (en un celular, 13 quedaban
+// miniatura). TARGET_WIDTH sigue fijo en 1600 (ver renderFixedMosaic),
+// así que para menos columnas hacen falta recortes más anchos/altos;
+// se pisan los sliders ANTES de armar el mosaico (buildMosaic los lee
+// recién ahí). Mismo corte de pantalla que el resto del sitio (--barra-
+// alto y la barra de botones en style.css). Solo se decide una vez al
+// cargar, como el resto del mosaico (no se rearma si después resizeás).
+if (window.innerWidth <= 820) {
+  // 260 es el máximo del slider tileW (index.html, max="260"); 1600/260
+  // ≈ 6,15 -> redondea a 6 columnas igual.
+  const TILE_W_MOBILE = 260;
+  const TILE_W_BASE = 120; // el default (index.html), contra el que están calibrados mosaicoDensidad y WORK_DIM
+  tileWSlider.value = TILE_W_MOBILE;
+  tileHSlider.value = 130;
+  // Cada recorte de la foto sale de un cuadrado de trabajo (workDim =
+  // WORK_DIM * mosaicoDensidad) cortado en colsUnits = workDim/tileW
+  // pedazos por lado (ver buildMosaic). Al agrandar tileW para tener
+  // menos columnas, colsUnits se achica solo -salen MENOS recortes por
+  // foto-, así que el mosaico entero queda mucho más corto que la
+  // página (en invierno, con cols=6, quedaba sin cuadraditos bastante
+  // antes del final del scroll). Se compensa subiendo mosaicoDensidad en
+  // la misma proporción que tileW, para mantener aprox. la misma
+  // cantidad de recortes por foto que en desktop.
+  if (SEASON_CFG) {
+    SEASON_CFG.mosaicoDensidad = (SEASON_CFG.mosaicoDensidad || 1) * (TILE_W_MOBILE / TILE_W_BASE);
+  }
+}
+
 // Sin estación elegida no hay mosaico: la web queda en la pantalla
 // "Estaciones" hasta que se elige otoño o invierno.
 if (CURRENT_SEASON) loadAssetBackground();
@@ -1307,10 +1336,17 @@ function renderPoemList(poems) {
 // en el viewport. No arranca hasta que el mosaico de fotos terminó de
 // dibujarse: si todavía no, se deja en espera y markMosaicReady() vuelve
 // a llamar acá. Así los poemas y las fechas aparecen junto con las fotos.
+//
+// En pantallas angostas (mismo corte que el resto del sitio, ver
+// style.css) se muestran TODOS juntos apenas está listo el mosaico, no
+// de a uno a medida que cada uno entra en pantalla al scrollear -esto
+// último es lo que hace el IntersectionObserver de más abajo, pensado
+// para desktop-.
 function revealOnScroll() {
   if (!mosaicReady) { revealPendiente = true; return; }
   const items = poemCard.querySelectorAll('.poem');
-  if (!('IntersectionObserver' in window)) {
+  const revelarTodosJuntos = window.innerWidth <= 820;
+  if (revelarTodosJuntos || !('IntersectionObserver' in window)) {
     items.forEach(el => {
       el.classList.add('visible');
       startTypewriter(el);
@@ -1993,12 +2029,15 @@ const ESTACIONES_FOTO_MS = 5000;
     flechaNext.className = 'estaciones-flecha estaciones-flecha--next';
     flechaPrev.setAttribute('aria-label', 'Foto anterior');
     flechaNext.setAttribute('aria-label', 'Foto siguiente');
-    flechaPrev.textContent = '◂';
-    flechaNext.textContent = '▸';
-    // fuera de .estaciones-cuadro (tiene overflow:hidden y las recortaría)
-    const cont = cuadro.parentElement || cuadro;
-    cont.appendChild(flechaPrev);
-    cont.appendChild(flechaNext);
+    // el triángulo lo dibuja el CSS (.estaciones-flecha::before), no es
+    // texto: así sale igual en cualquier navegador (ver style.css).
+    // DENTRO de .estaciones-cuadro (no tiene overflow:hidden, las <img>
+    // ya calzan justo con object-fit): así quedan ancladas a la caja de
+    // fotos de verdad -mismo padding-box- en vez de depender de un
+    // cálculo aparte contra .estaciones-home, que se desalineaba según
+    // cuánto sobrara de alto libre alrededor del texto.
+    cuadro.appendChild(flechaPrev);
+    cuadro.appendChild(flechaNext);
     flechaPrev.addEventListener('click', () => { mostrar(i - 1); programar(); });
     flechaNext.addEventListener('click', () => { mostrar(i + 1); programar(); });
   }
