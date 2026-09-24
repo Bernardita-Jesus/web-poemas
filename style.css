@@ -613,6 +613,66 @@ body[data-estacion="invierno"]::after {
 .topbar.topbar--oculta {
   margin-top: calc(var(--topbar-alto) * -1);
 }
+/* En celular, animar margin-top obliga a recalcular el layout entero en
+   cada frame (.scroll-area, flex: 1, cambia de alto), y eso compite con
+   el gesto táctil de scroll -se siente pegajoso/entrecortado al bajar
+   con el dedo, mucho más notorio que con mouse/trackpad en desktop-.
+   Acá el efecto se rehace con transform, que nunca dispara layout
+   (solo composición, siempre fluido): la barra pasa a position:fixed
+   -sale del flujo, sobrepuesta-. Sin transition: script.js (bloque
+   EFECTO BARRA) la mueve a mano, pegada 1 a 1 con cada píxel de
+   scroll -no por un toggle con su propia animación, que quedaba a
+   otra velocidad que el resto del scroll-, así que agregar una
+   transición acá solo metería un delay detrás de cada cambio.
+   .topbar--oculta (el toggle con transición) es cosa de desktop; en
+   celular no se usa.
+
+   Reservar o no el lugar de la barra depende de la vista:
+     - "Estaciones" (portada, texto corto): SÍ lo reserva
+       (.vista-estaciones .scroll-area, más abajo) -que el título
+       quedara tapado al abrir la web sería un problema real.
+     - Estación (invierno/otoño, mosaico largo): NO lo reserva- el
+       mosaico ya arranca ocupando toda la pantalla y la barra
+       simplemente tapa/destapa su borde de arriba, así nunca queda
+       un hueco vacío ni arriba ni abajo mientras se scrollea (si
+       reservara Y se moviera el mosaico para compensar, quedaría el
+       mismo problema de animar layout de más arriba). */
+@media (max-width: 820px) {
+  .topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    margin-top: 0;                 /* ya no se usa acá: la mueve el transform de abajo */
+    transition: none;
+    transform: translateY(0);
+  }
+  .vista-estaciones .scroll-area {
+    margin-top: var(--topbar-alto);
+  }
+  /* estación: el carril de la barra de scroll propia pasa a ocupar toda
+     la pantalla (ya no arranca debajo de la barra, que ahora se
+     superpone en vez de reservar lugar). En la portada sigue
+     empezando debajo (ver .vista-estaciones .cscroll un poco más
+     abajo, que no se toca). */
+  body:not(.vista-estaciones) .cscroll {
+    top: 0;
+  }
+  /* ídem .stage (el fondo del mosaico): llena la pantalla completa, no
+     "pantalla menos la barra" -ya no hay nada reservado que restar-.
+     Solo importa para estación: en la portada .stage ni se muestra. */
+  .stage {
+    min-height: 100dvh;
+  }
+  /* El mosaico de fondo llena la pantalla completa (arriba), pero el
+     TEXTO de los poemas no debe arrancar tapado por la barra -a
+     diferencia del fondo, tapar la fecha del primer poema sí se nota-.
+     Se empuja el primero (y todos) hacia abajo lo que mide la barra,
+     de más al padding-top que ya tenían. */
+  body:not(.vista-estaciones) .poem-card {
+    padding-top: calc(10vh + var(--topbar-alto));
+  }
+}
 .topbar-btn {
   flex: 1 1 0;
   min-width: 0;

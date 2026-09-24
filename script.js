@@ -1908,10 +1908,36 @@ function renderFlowMosaic(tiles, rowHeight, minWidth, maxWidth, onDone) {
 // EFECTO BARRA
 // ---------------------------------------------------------------------
 // Al scrollear para abajo dentro de .scroll-area (la única caja que
-// scrollea, ver style.css), la barra de botones sube y se esconde, así
-// el mosaico y los poemas ganan toda la pantalla; al scrollear para
-// arriba —o al llegar arriba del todo— vuelve a bajar. La sube/baja pone
-// o saca .topbar--oculta, que anima el margin-top en style.css.
+// scrollea, ver style.css), la barra de botones sube y se esconde; al
+// scrollear para arriba —o al llegar arriba del todo— vuelve a bajar.
+//
+// En desktop es un toggle con transición propia (.topbar--oculta en
+// style.css anima margin-top medio segundo): la barra se esconde, el
+// mosaico sube y ocupa su lugar. En celular la barra va PEGADA al
+// dedo: cada píxel que se scrollea la corre ese mismo píxel (sin
+// transición CSS de por medio, que quedaba a otra velocidad que el
+// resto del scroll y se sentía desincronizada), hasta quedar
+// completamente afuera de pantalla; al revés al scrollear para arriba,
+// sea cual sea la posición.
+//
+// En las páginas de estación (invierno/otoño) el mosaico nunca se
+// mueve (para no repetir el enganchón de animar layout durante el
+// scroll táctil): la barra queda SUPERPUESTA -no reserva lugar propio,
+// ver .scroll-area/.stage/#cscroll en el @media de style.css-, el
+// mosaico ya arranca ocupando toda la pantalla y la barra tapa/destapa
+// su borde de arriba al aparecer/esconderse, en vez de correrlo.
+//
+// En la portada ("Estaciones") SÍ se sigue reservando el lugar de la
+// barra (el título quedaría tapado si no) pero el contenido (.scroll-
+// area) y la barra de scroll propia (#cscroll) suben con ella al
+// esconderse, para no dejar tampoco ahí un hueco vacío: como el
+// contenido de la portada es corto, el margen que queda libre abajo al
+// subir es chico y no se nota.
+//
+// Al subir (mostrar) la barra reacciona más rápido que al bajar
+// (esconder): FACTOR_SUBIDA multiplica cuánto se destapa por cada
+// píxel que se scrollea para arriba, así no hace falta scrollear tanto
+// para volver a verla.
 // =====================================================================
 const EFECTO_BARRA = true;
 (function () {
@@ -1919,6 +1945,29 @@ const EFECTO_BARRA = true;
   const barra = document.getElementById('topbar');
   const area = document.querySelector('.scroll-area');
   if (!barra || !area) return;
+
+  if (window.matchMedia('(max-width: 820px)').matches) {
+    const FACTOR_SUBIDA = 2.5;
+    const esPortada = !CURRENT_SEASON;
+    const cscroll = document.getElementById('cscroll');
+    let ultimoScroll = area.scrollTop;
+    let offset = 0; // 0 = barra en su lugar; -altoBarra = del todo afuera
+    area.addEventListener('scroll', () => {
+      const actual = area.scrollTop;
+      const delta = actual - ultimoScroll;
+      const altoBarra = barra.offsetHeight;
+      const avance = delta > 0 ? delta : delta * FACTOR_SUBIDA;
+      offset = Math.max(-altoBarra, Math.min(0, offset - avance));
+      const t = 'translateY(' + offset + 'px)';
+      barra.style.transform = t;
+      if (esPortada) {
+        area.style.transform = t;
+        if (cscroll) cscroll.style.transform = t;
+      }
+      ultimoScroll = actual;
+    }, { passive: true });
+    return;
+  }
 
   const UMBRAL_ARRIBA = 8; // px: cerca del tope, la barra siempre se ve
   let ultimoScroll = area.scrollTop;
