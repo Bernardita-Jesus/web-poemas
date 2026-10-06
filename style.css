@@ -504,6 +504,28 @@ body[data-estacion="invierno"]::after {
   );
 }
 
+/* Grano: ruido sutil sobre el fondo de las estaciones (mosaico + huecos
+   + velo), para que no quede tan plano/liso. Es un ::before (pinta
+   ANTES que el velo ::after de arriba, mismo z-index: en orden de
+   documento, así el velo lo tiñe por encima) con ruido generado por
+   SVG (feTurbulence), sin ninguna imagen. mix-blend-mode: overlay lo
+   funde con lo de abajo en vez de taparlo; la opacidad baja (.05) es
+   lo que lo mantiene sutil -subila para más grano, bajala para menos. */
+body[data-estacion]::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100dvh;
+  z-index: 4;
+  pointer-events: none;
+  opacity: .05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
 /* ---------------------------------------------------------------------
    EFECTO TEXTURAS: una capa de fotos horizontales (apaisadas)
    SUPERPUESTA encima del mosaico. Va por encima del mosaico y del velo

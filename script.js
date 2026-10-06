@@ -449,6 +449,22 @@ function renderCurrentTiles(onDone) {
   }
 }
 
+// EXPERIMENTAL: deja algunos recortes sin dibujar, mostrando el fondo de
+// la página (--bg en style.css) en su lugar del mosaico. 0 = apagado,
+// todos los recortes se dibujan como antes; subí el número (0-100) para
+// más huecos. Se decide al azar, celda por celda, cada vez que se arma
+// el mosaico. Las celdas con hueco quedan afuera del efecto mosaico
+// (ver cellPan en startMosaicDrift): nunca les aparece un recorte
+// después, se quedan vacías todo el tiempo.
+const MOSAICO_HUECOS_PORCENTAJE = 45;
+// mismo color que --bg en style.css: si cambia uno, cambiá el otro. Es
+// el default; cada estación puede pisarlo con su propio mosaicoFondo
+// (ver ESTACIONES más abajo -por ahora solo otoño, gris del botón
+// "Poemas y estaciones"). Ojo: NO se puede resolver acá arriba del todo
+// con SEASON_CFG -se define más abajo en el archivo-, por eso se arma
+// adentro de renderFixedMosaic, cuando ya existe.
+const MOSAICO_FONDO = '#fdf6dc';
+
 function renderFixedMosaic(tiles, tileW, tileH, onDone) {
   const n = tiles.length;
   // Ancho fijo (pensado para pantalla); las filas necesarias se apilan hacia
@@ -472,10 +488,21 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
   canvas.width = cols * tileW;
   canvas.height = rows * tileH;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#ffffff';
+  const fondo = (SEASON_CFG && SEASON_CFG.mosaicoFondo) || MOSAICO_FONDO;
+  ctx.fillStyle = MOSAICO_HUECOS_PORCENTAJE > 0 ? fondo : '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   holder.appendChild(canvas);
   mosaicCanvas = canvas;
+
+  // Celdas que se dejan vacías (muestran el fondo recién pintado, sin
+  // recorte encima): se decide una sola vez acá y se reusa en
+  // startMosaicDrift para que el efecto mosaico no las toque después.
+  const huecos = new Set();
+  if (MOSAICO_HUECOS_PORCENTAJE > 0) {
+    for (let c = 0; c < total; c++) {
+      if (Math.random() * 100 < MOSAICO_HUECOS_PORCENTAJE) huecos.add(c);
+    }
+  }
 
   let i = 0;
   const BATCH = 80;
@@ -483,6 +510,7 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
   function drawStep() {
     const end = Math.min(i + BATCH, total);
     for (; i < end; i++) {
+      if (huecos.has(i)) continue;      // queda el fondo, sin recorte
       const col = i % cols;
       const row = Math.floor(i / cols);
       // Para las celdas sobrantes de la última fila (i >= n) reflejamos hacia
@@ -498,7 +526,7 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
     } else {
       // efecto mosaico: con el fondo ya dibujado, dejamos que algunos
       // cuadrados se vayan cambiando de a poco (ver EFECTO_MOSAICO).
-      startMosaicDrift(ctx, tiles, n, tileW, tileH, cols, total);
+      startMosaicDrift(ctx, tiles, n, tileW, tileH, cols, total, huecos);
       if (onDone) onDone();
     }
   }
@@ -508,7 +536,7 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
 // efecto mosaico: arranca (o reinicia) el cambio gradual de cuadrados
 // sobre el canvas ya dibujado. Un reloj interno corre en pasos chicos y,
 // en cada paso, toca unos pocos cuadrados según el modo elegido.
-function startMosaicDrift(ctx, tiles, n, tileW, tileH, cols, total) {
+function startMosaicDrift(ctx, tiles, n, tileW, tileH, cols, total, huecos) {
   stopMosaicDrift();
   if (!EFECTO_MOSAICO || prefersReducedMotion) return;
   if (total === 0 || cols === 0) return;
@@ -516,11 +544,14 @@ function startMosaicDrift(ctx, tiles, n, tileW, tileH, cols, total) {
   // Qué celda muestra cada recorte (misma regla que el dibujado: las
   // celdas sobrantes reflejan el final del array). Para el modo 'desliz'
   // guardamos una copia por celda del origen del paneo, así cada una se
-  // pasea por su foto sin pisar a las demás.
+  // pasea por su foto sin pisar a las demás. Las celdas con hueco (ver
+  // MOSAICO_HUECOS_PORCENTAJE) quedan en null: nunca les aparece un
+  // recorte, igual que si no tuvieran tile (ver el `!pan` de más abajo).
   let cellPan = null;
   if (MOSAICO_MODO === 'desliz') {
     cellPan = new Array(total);
     for (let i = 0; i < total; i++) {
+      if (huecos && huecos.has(i)) { cellPan[i] = null; continue; }
       let idx = i;
       if (idx >= n) idx = Math.max(0, 2 * n - 1 - idx);
       const t = tiles[idx];
@@ -715,6 +746,10 @@ const ESTACIONES = {
     // "Estaciones" (ver "FOTOS DE LA PESTAÑA ESTACIONES").
     nombre: 'Otoño',
     anio: 2026,
+    // fondo del mosaico (huecos sin recorte, ver MOSAICO_HUECOS_PORCENTAJE
+    // más abajo): mismo gris que el botón "Poemas y estaciones" de la
+    // barra (.topbar-btn:nth-child(1) en style.css, #dedede).
+    mosaicoFondo: '#dedede',
     // sentido del degradado por brillo (ver SORT_MODE): claro arriba.
     orden: 'brightness',
     // cuántas texturas apaisadas se colocan (mínimo; ver construirTexturas)
@@ -746,6 +781,10 @@ const ESTACIONES = {
     // "Estaciones" (ver "FOTOS DE LA PESTAÑA ESTACIONES").
     nombre: 'Invierno',
     anio: 2026,
+    // fondo del mosaico (huecos sin recorte, ver MOSAICO_HUECOS_PORCENTAJE
+    // más abajo): el morado grisáceo del botón "Otoño" (.topbar-btn:
+    // nth-child(2) en style.css, #6f6480), pero más claro.
+    mosaicoFondo: '#a19aac',
     // sentido del degradado por brillo (ver SORT_MODE): oscuro arriba.
     orden: 'brightness-dark',
     // cuántos recortes deslizándose a la vez (ver MOSAICO_MAX_ACTIVAS).
