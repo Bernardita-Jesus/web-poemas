@@ -11,7 +11,7 @@
 <title>Poemas y estaciones</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=182">
+<link rel="stylesheet" href="style.css?v=185">
 <script>
   // La página tiene que abrir siempre desde arriba del todo. Si el
   // navegador restaura la posición de scroll de una visita anterior (o
@@ -48,6 +48,10 @@
      poemas. Se llena desde script.js (bloque "EFECTO TEXTURAS"); vacía
      queda oculta por CSS. -->
 <div class="textura-capa" id="texturaCapa"></div>
+<!-- EXPERIMENTAL: efecto raíces (ver script.js, bloque "EFECTO RAICES").
+     Canvas fijo al viewport (no scrollea con la página): dibuja líneas
+     ancladas abajo que se estiran hacia el cursor. -->
+<canvas class="raices-capa" id="raicesCapa"></canvas>
 <div class="wrap">
   <div class="panel">
     <div>
@@ -77,13 +81,13 @@
            de la home (el panel de controles está oculto): subilos para
            recortes más grandes, bajalos para un mosaico más fino. -->
       <div class="field">
-        <label>Ancho del recorte: <span class="rangeval" id="tileWVal">120</span> px</label>
-        <input type="range" id="tileW" min="60" max="260" value="120" step="2">
+        <label>Ancho del recorte: <span class="rangeval" id="tileWVal">90</span> px</label>
+        <input type="range" id="tileW" min="60" max="260" value="90" step="2">
       </div>
 
       <div class="field">
-        <label>Alto del recorte: <span class="rangeval" id="tileHVal">60</span> px</label>
-        <input type="range" id="tileH" min="60" max="200" value="60" step="2">
+        <label>Alto del recorte: <span class="rangeval" id="tileHVal">45</span> px</label>
+        <input type="range" id="tileH" min="30" max="200" value="45" step="2">
       </div>
     </div>
 
@@ -163,6 +167,6 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
-<script src="script.js?v=182"></script>
+<script src="script.js?v=185"></script>
 </body>
 </html>

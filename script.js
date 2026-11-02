@@ -1844,6 +1844,135 @@ function iniciarDeslizScroll() {
 // después saltan de lugar. (markMosaicReady tiene su propia red de
 // seguridad a los 8 s por si el mosaico nunca termina.)
 
+// =====================================================================
+// EFECTO RAICES (EXPERIMENTAL)
+// ---------------------------------------------------------------------
+// Unas líneas ancladas al piso de la pantalla (no de la página: el
+// canvas es fijo al viewport, ver .raices-capa en style.css) que se
+// estiran hacia donde está el cursor, como raíces creciendo hacia la
+// luz. Cada una tiene un alcance máximo (RAICES_ALCANCE): no persigue
+// el cursor entero, se "achica" cuando el cursor está lejos de su
+// anclaje. Sin cursor (o antes del primer movimiento) no quedan
+// recogidas/invisibles: crecen solas hasta un largo idle y se balancean
+// despacio, así siempre hay raíces en pantalla. No depende del mosaico
+// ni de ninguna otra capa; corre siempre que haya canvas, en cualquier
+// vista.
+//
+// PARA DESACTIVARLO: poné EFECTO_RAICES en false.
+// =====================================================================
+const EFECTO_RAICES = true;
+(function () {
+  if (!EFECTO_RAICES || prefersReducedMotion) return;
+  const canvas = document.getElementById('raicesCapa');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  const CANTIDAD = 7;
+  const ALCANCE_MIN = 140, ALCANCE_SPAN = 180;   // alcance por raíz: 140–320px
+  const IDLE_LARGO_MIN = 90, IDLE_LARGO_SPAN = 90; // largo en reposo (sin cursor): 90–180px
+  const IDLE_BALANCEO = 26;        // cuánto se mece el idle a los costados, en px
+  const SUAVIZADO = 0.055;        // qué tan rápido la punta alcanza su objetivo (0–1)
+  const SEGMENTOS = 7;            // puntos intermedios para la curva orgánica
+  const JITTER = 16;              // ondulado perpendicular al tallo, en px
+  const COLOR = 'rgba(255, 255, 255, 0.55)'; // blancas
+
+  let dpr = Math.min(2, window.devicePixelRatio || 1);
+  let raices = [];
+  // el mouse arranca "sin posición": hasta el primer movimiento, cada
+  // raíz usa su objetivo idle (ver frame()) en vez de perseguir el
+  // cursor.
+  let mouseX = null, mouseY = null;
+
+  function crearRaices() {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    raices = [];
+    for (let i = 0; i < CANTIDAD; i++) {
+      const anchorX = (w / (CANTIDAD + 1)) * (i + 1) + (Math.random() - 0.5) * 40;
+      raices.push({
+        anchorX, anchorY: h,
+        tipX: anchorX, tipY: h,
+        alcance: ALCANCE_MIN + Math.random() * ALCANCE_SPAN,
+        idleLargo: IDLE_LARGO_MIN + Math.random() * IDLE_LARGO_SPAN,
+        fase: Math.random() * Math.PI * 2,   // desfasa el ondulado entre raíces
+        faseIdle: Math.random() * Math.PI * 2, // desfasa el balanceo en reposo
+      });
+    }
+  }
+
+  function redimensionar() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.round(window.innerWidth * dpr);
+    canvas.height = Math.round(window.innerHeight * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    crearRaices();
+  }
+  redimensionar();
+  window.addEventListener('resize', redimensionar);
+
+  window.addEventListener('pointermove', (e) => {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+  }, { passive: true });
+  // si el cursor se va de la ventana, las raíces se recogen de nuevo.
+  window.addEventListener('pointerleave', () => { mouseX = null; mouseY = null; });
+
+  // Dibuja una raíz como una curva suave del anclaje a la punta, con un
+  // ondulado perpendicular chico (JITTER) para que no sea una línea
+  // recta -más orgánico-. `t` global para que el ondulado respire
+  // despacio en vez de quedar estático.
+  function dibujarRaiz(r, t) {
+    const dx = r.tipX - r.anchorX, dy = r.tipY - r.anchorY;
+    const largo = Math.hypot(dx, dy);
+    if (largo < 1) return;
+    // perpendicular unitario al tallo, para desplazar los puntos intermedios
+    const px = -dy / largo, py = dx / largo;
+
+    ctx.beginPath();
+    ctx.moveTo(r.anchorX, r.anchorY);
+    for (let s = 1; s <= SEGMENTOS; s++) {
+      const f = s / SEGMENTOS;
+      const baseX = r.anchorX + dx * f;
+      const baseY = r.anchorY + dy * f;
+      // el ondulado se apaga en las dos puntas (sin(f*PI)) para que nazca
+      // del anclaje y termine justo en la punta, sin quiebre.
+      const onda = Math.sin(f * Math.PI) * JITTER * Math.sin(t * 0.0006 + r.fase + f * 4);
+      ctx.lineTo(baseX + px * onda, baseY + py * onda);
+    }
+    ctx.stroke();
+  }
+
+  function frame(t) {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+    ctx.strokeStyle = COLOR;
+    ctx.lineWidth = 1.4;
+    ctx.lineCap = 'round';
+
+    raices.forEach(r => {
+      let targetX, targetY;
+      if (mouseX !== null) {
+        const dx = mouseX - r.anchorX, dy = mouseY - r.anchorY;
+        const dist = Math.hypot(dx, dy);
+        const alcanceReal = Math.min(dist, r.alcance);
+        const ang = Math.atan2(dy, dx);
+        targetX = r.anchorX + Math.cos(ang) * alcanceReal;
+        targetY = r.anchorY + Math.sin(ang) * alcanceReal;
+      } else {
+        // sin cursor (o antes del primer movimiento): crece derecho hacia
+        // arriba hasta su largo idle, con un balanceo lento a los costados.
+        targetX = r.anchorX + Math.sin(t * 0.00035 + r.faseIdle) * IDLE_BALANCEO;
+        targetY = r.anchorY - r.idleLargo;
+      }
+      r.tipX += (targetX - r.tipX) * SUAVIZADO;
+      r.tipY += (targetY - r.tipY) * SUAVIZADO;
+      dibujarRaiz(r, t);
+    });
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+
 function renderFlowMosaic(tiles, rowHeight, minWidth, maxWidth, onDone) {
   // Fixed-height row flow: tiles keep whatever width they were extracted at
   // (already between minWidth and maxWidth) and simply wrap to a new row

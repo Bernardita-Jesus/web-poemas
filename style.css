@@ -8,12 +8,12 @@
   --text: #4a3f28;
   --text-dim: #96895f;
   /* Alto de UNA fila de la barra superior = alto de un recorte del
-     mosaico. El canvas se reparte en 13 columnas y cada recorte mide
-     media columna de alto (tileW 120 : tileH 60 en index.html). Lo usa
+     mosaico. El canvas se reparte en 18 columnas y cada recorte mide
+     media columna de alto (tileW 90 : tileH 45 en index.html). Lo usa
      el alto de los botones (.topbar-btn) y .poem-card (bottom, para
      dejar afuera la fila extra del mosaico -no tiene que ver con la
      barra, es la misma medida por coincidencia). */
-  --barra-alto: calc(100vw / 13 / 2);
+  --barra-alto: calc(100vw / 18 / 2);
   /* Alto real de una fila de LA BARRA (.topbar-btn). En desktop es el
      mismo --barra-alto (coincide con la grilla del mosaico); en
      pantallas angostas se pisa con un valor fijo más cómodo para tocar
@@ -353,10 +353,10 @@ body {
   justify-content: space-between;
   padding: 10vh 0;
   /* Ancho de una columna del mosaico en pantalla: el canvas se muestra
-     al 100% del viewport y tiene 13 columnas (TARGET_WIDTH 1600 dividido
-     tileW 120, redondeado, en script.js). Se usa para ubicar los poemas
-     respecto de la grilla. */
-  --col: calc(100vw / 13);
+     al 100% del viewport y tiene 18 columnas (TARGET_WIDTH 1600 dividido
+     tileW 90, redondeado, en script.js e index.html). Se usa para ubicar
+     los poemas respecto de la grilla. */
+  --col: calc(100vw / 18);
 }
 .poem-card:empty {
   display: none;
@@ -551,15 +551,34 @@ body[data-estacion]::before {
   opacity: 0;
   transition: opacity .5s ease;
   /* Ancho en pantalla de UNA columna del mosaico: el canvas se reparte
-     en 13 columnas (TARGET_WIDTH 1600 / tileW 120, redondeado; ver
+     en 18 columnas (TARGET_WIDTH 1600 / tileW 90, redondeado; ver
      script.js y .poem-card). Ancho, alto y top de cada textura se miden
      como múltiplos de --col para pegar con la grilla. Este valor es un
      respaldo: al armar la capa, script.js lo pisa con la medida exacta
-     en px (ancho del canvas / 13, sin barra de scroll). */
-  --col: calc(100vw / 13);
+     en px (ancho del canvas / 18, sin barra de scroll). */
+  --col: calc(100vw / 18);
 }
 .textura-capa:empty { display: none; }
 .textura-capa.lista { opacity: 1; }
+
+/* EXPERIMENTAL: efecto raíces (ver script.js, bloque "EFECTO RAICES").
+   Fijo al viewport (no a .contenido, que es tan alto como toda la
+   página): así el canvas mide solo lo que se ve, no la página entera,
+   y las raíces quedan anclado al PISO DE LA PANTALLA sea cual sea el
+   scroll, no al fondo de la página. Por encima del mosaico y las
+   texturas, por debajo de los poemas.
+
+   mix-blend-mode: difference invierte el color contra lo que haya
+   debajo, así las líneas blancas quedan visibles tanto sobre el
+   mosaico oscuro como sobre el fondo crema claro de la portada, sin
+   tener que elegir un color fijo que funcione en los dos casos. */
+.raices-capa {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  mix-blend-mode: difference;
+}
 
 .textura-slide {
   /* ubicación al azar dentro de la capa: el `top` lo pone script.js. La
