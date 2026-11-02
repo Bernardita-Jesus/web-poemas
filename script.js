@@ -1862,18 +1862,19 @@ function iniciarDeslizScroll() {
 // =====================================================================
 const EFECTO_RAICES = true;
 (function () {
-  if (!EFECTO_RAICES || prefersReducedMotion) return;
+  if (!EFECTO_RAICES) return;
   const canvas = document.getElementById('raicesCapa');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
 
   const CANTIDAD = 7;
-  const ALCANCE_MIN = 140, ALCANCE_SPAN = 180;   // alcance por raíz: 140–320px
-  const IDLE_LARGO_MIN = 90, IDLE_LARGO_SPAN = 90; // largo en reposo (sin cursor): 90–180px
-  const IDLE_BALANCEO = 26;        // cuánto se mece el idle a los costados, en px
+  const ALCANCE_MIN = 240, ALCANCE_SPAN = 280;   // alcance por raíz: 240–520px
+  const IDLE_LARGO_MIN = 200, IDLE_LARGO_SPAN = 180; // largo en reposo (sin cursor): 200–380px
+  const IDLE_BALANCEO = 40;        // cuánto se mece el idle a los costados, en px
   const SUAVIZADO = 0.055;        // qué tan rápido la punta alcanza su objetivo (0–1)
   const SEGMENTOS = 7;            // puntos intermedios para la curva orgánica
-  const JITTER = 16;              // ondulado perpendicular al tallo, en px
+  const JITTER = 26;              // ondulado perpendicular al tallo, en px
+  const GROSOR = 3;                // ancho de línea, en px
   const COLOR = 'rgba(255, 255, 255, 0.55)'; // blancas
 
   let dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -1899,15 +1900,29 @@ const EFECTO_RAICES = true;
     }
   }
 
+  // Con "reducir movimiento" del sistema, nada de animación ni de seguir
+  // al cursor: se dejan las raíces dibujadas una sola vez, quietas en su
+  // largo idle, y listo (mejor que no mostrar nada, como antes).
+  function dibujarEstatico() {
+    raices.forEach(r => { r.tipX = r.anchorX; r.tipY = r.anchorY - r.idleLargo; });
+    ctx.strokeStyle = COLOR;
+    ctx.lineWidth = GROSOR;
+    ctx.lineCap = 'round';
+    raices.forEach(r => dibujarRaiz(r, 0));
+  }
+
   function redimensionar() {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.round(window.innerWidth * dpr);
     canvas.height = Math.round(window.innerHeight * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     crearRaices();
+    if (prefersReducedMotion) dibujarEstatico();
   }
   redimensionar();
   window.addEventListener('resize', redimensionar);
+
+  if (prefersReducedMotion) return;
 
   window.addEventListener('pointermove', (e) => {
     mouseX = e.clientX;
@@ -1945,7 +1960,7 @@ const EFECTO_RAICES = true;
     const w = canvas.clientWidth, h = canvas.clientHeight;
     ctx.clearRect(0, 0, w, h);
     ctx.strokeStyle = COLOR;
-    ctx.lineWidth = 1.4;
+    ctx.lineWidth = GROSOR;
     ctx.lineCap = 'round';
 
     raices.forEach(r => {
