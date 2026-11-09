@@ -8,12 +8,12 @@
   --text: #4a3f28;
   --text-dim: #96895f;
   /* Alto de UNA fila de la barra superior = alto de un recorte del
-     mosaico. El canvas se reparte en 18 columnas y cada recorte mide
-     media columna de alto (tileW 90 : tileH 45 en index.html). Lo usa
+     mosaico. El canvas se reparte en 23 columnas y cada recorte mide
+     media columna de alto (tileW 70 : tileH 36 en index.html). Lo usa
      el alto de los botones (.topbar-btn) y .poem-card (bottom, para
      dejar afuera la fila extra del mosaico -no tiene que ver con la
      barra, es la misma medida por coincidencia). */
-  --barra-alto: calc(100vw / 18 / 2);
+  --barra-alto: calc(100vw / 23 / 2);
   /* Alto real de una fila de LA BARRA (.topbar-btn). En desktop es el
      mismo --barra-alto (coincide con la grilla del mosaico); en
      pantallas angostas se pisa con un valor fijo más cómodo para tocar
@@ -353,10 +353,10 @@ body {
   justify-content: space-between;
   padding: 10vh 0;
   /* Ancho de una columna del mosaico en pantalla: el canvas se muestra
-     al 100% del viewport y tiene 18 columnas (TARGET_WIDTH 1600 dividido
-     tileW 90, redondeado, en script.js e index.html). Se usa para ubicar
+     al 100% del viewport y tiene 23 columnas (TARGET_WIDTH 1600 dividido
+     tileW 70, redondeado, en script.js e index.html). Se usa para ubicar
      los poemas respecto de la grilla. */
-  --col: calc(100vw / 18);
+  --col: calc(100vw / 23);
 }
 .poem-card:empty {
   display: none;
@@ -409,13 +409,13 @@ body {
 .poem-titulo {
   font-family: 'Source Serif 4', serif;
   font-weight: 600;
-  font-size: 24px;
+  font-size: 21px;
   margin: 0 0 12px 0;
 }
 
 .poem-linea {
   font-family: 'Source Serif 4', serif;
-  font-size: 20px;
+  font-size: 17px;
   line-height: 1.6;
   margin: 0;
   /* efecto escritura: reserva el alto de un renglón aunque el verso
@@ -551,33 +551,35 @@ body[data-estacion]::before {
   opacity: 0;
   transition: opacity .5s ease;
   /* Ancho en pantalla de UNA columna del mosaico: el canvas se reparte
-     en 18 columnas (TARGET_WIDTH 1600 / tileW 90, redondeado; ver
+     en 23 columnas (TARGET_WIDTH 1600 / tileW 70, redondeado; ver
      script.js y .poem-card). Ancho, alto y top de cada textura se miden
      como múltiplos de --col para pegar con la grilla. Este valor es un
      respaldo: al armar la capa, script.js lo pisa con la medida exacta
-     en px (ancho del canvas / 18, sin barra de scroll). */
-  --col: calc(100vw / 18);
+     en px (ancho del canvas / 23, sin barra de scroll). */
+  --col: calc(100vw / 23);
 }
 .textura-capa:empty { display: none; }
 .textura-capa.lista { opacity: 1; }
 
 /* EXPERIMENTAL: efecto raíces (ver script.js, bloque "EFECTO RAICES").
-   Fijo al viewport (no a .contenido, que es tan alto como toda la
-   página): así el canvas mide solo lo que se ve, no la página entera,
-   y las raíces quedan anclado al PISO DE LA PANTALLA sea cual sea el
-   scroll, no al fondo de la página. Por encima del mosaico y las
-   texturas, por debajo de los poemas.
+   Absoluto contra .contenido (que mide toda la página, no solo la
+   pantalla visible -ver su position:relative más arriba-): así las
+   raíces, ancladas cada una a la posición real de un poema, scrollean
+   junto con los poemas y el mosaico en vez de quedarse pegadas a la
+   ventana. Por encima del mosaico y las texturas, por debajo de los
+   poemas.
 
-   mix-blend-mode: difference invierte el color contra lo que haya
-   debajo, así las líneas blancas quedan visibles tanto sobre el
-   mosaico oscuro como sobre el fondo crema claro de la portada, sin
-   tener que elegir un color fijo que funcione en los dos casos. */
+   Sin mix-blend-mode: invertía el color contra lo que hubiera debajo
+   -quedaban grises o de otro color según el fondo, nunca blancas de
+   verdad-. En vez de eso, cada línea se dibuja dos veces en script.js
+   (un borde oscuro grueso y, encima, un trazo blanco más fino), así se
+   ven blancas de verdad y siguen teniendo contraste en cualquier
+   fondo. */
 .raices-capa {
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: 4;
   pointer-events: none;
-  mix-blend-mode: difference;
 }
 
 .textura-slide {

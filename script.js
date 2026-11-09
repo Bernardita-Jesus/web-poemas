@@ -1,5 +1,14 @@
 let uploadedImages = [];
 let mosaicCanvas = null;
+// Geometría y huecos del último mosaico armado (ver renderFixedMosaic):
+// se guardan acá para poder "apagar" después, retroactivamente, los
+// cuadrados que caigan debajo del texto de un poema (ver
+// ocultarCuadradosBajoPoemas, llamada desde revealOnScroll). El mosaico
+// se arma antes de saber dónde van a terminar los poemas -cargan aparte,
+// por YAML-, así que esto no se puede decidir de entrada.
+let mosaicHuecos = null;
+let mosaicTileWActual = 0, mosaicTileHActual = 0, mosaicColsActual = 0, mosaicRowsActual = 0;
+let mosaicFondoActual = '#fdf6dc';
 
 // Lo usan los dos efectos (escritura y mosaico): si el sistema pide
 // menos movimiento, se apagan solos.
@@ -456,7 +465,14 @@ function renderCurrentTiles(onDone) {
 // el mosaico. Las celdas con hueco quedan afuera del efecto mosaico
 // (ver cellPan en startMosaicDrift): nunca les aparece un recorte
 // después, se quedan vacías todo el tiempo.
-const MOSAICO_HUECOS_PORCENTAJE = 45;
+const MOSAICO_HUECOS_PORCENTAJE = 0;
+const MOSAICO_HUECOS_SUELTOS_PORCENTAJE = 10; // huecos random extra, sin agrupar, salpicados entre los recortes llenos
+// Los huecos ya no quedan 100% vacíos: muestran su propia foto mezclada
+// con el fondo a esta opacidad (0 = invisible, fondo puro; 1 = foto
+// entera, como si no fuera hueco). Bien bajo = se nota que hay algo ahí
+// -una foto fantasma- sin competir con los recortes llenos ni con el
+// texto de los poemas.
+const MOSAICO_HUECOS_OPACIDAD = 0.45;
 // mismo color que --bg en style.css: si cambia uno, cambiá el otro. Es
 // el default; cada estación puede pisarlo con su propio mosaicoFondo
 // (ver ESTACIONES más abajo -por ahora solo otoño, gris del botón
@@ -464,6 +480,17 @@ const MOSAICO_HUECOS_PORCENTAJE = 45;
 // con SEASON_CFG -se define más abajo en el archivo-, por eso se arma
 // adentro de renderFixedMosaic, cuando ya existe.
 const MOSAICO_FONDO = '#fdf6dc';
+
+// '#rrggbb' -> {r,g,b}. Los colores de fondo del mosaico (MOSAICO_FONDO,
+// mosaicoFondo por estación) siempre vienen en este formato.
+function hexARGB(hex) {
+  const h = hex.replace('#', '');
+  return {
+    r: parseInt(h.substring(0, 2), 16),
+    g: parseInt(h.substring(2, 4), 16),
+    b: parseInt(h.substring(4, 6), 16),
+  };
+}
 
 function renderFixedMosaic(tiles, tileW, tileH, onDone) {
   const n = tiles.length;
@@ -493,15 +520,86 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   holder.appendChild(canvas);
   mosaicCanvas = canvas;
+  mosaicTileWActual = tileW; mosaicTileHActual = tileH;
+  mosaicColsActual = cols; mosaicRowsActual = rows;
+  mosaicFondoActual = fondo;
 
   // Celdas que se dejan vacías (muestran el fondo recién pintado, sin
   // recorte encima): se decide una sola vez acá y se reusa en
   // startMosaicDrift para que el efecto mosaico no las toque después.
+  // En vez de tirar la moneda celda por celda (quedaba como "sal y
+  // pimienta", disperso parejo), se arranca de ese mismo ruido pero se
+  // lo suaviza unas pasadas: cada celda copia lo que opina la mayoría de
+  // sus 8 vecinas. Es la técnica típica de generar "cuevas" en mapas:
+  // el ruido se derrite hacia manchas/parches en vez de puntitos sueltos.
   const huecos = new Set();
   if (MOSAICO_HUECOS_PORCENTAJE > 0) {
+    let grid = new Uint8Array(total);
     for (let c = 0; c < total; c++) {
-      if (Math.random() * 100 < MOSAICO_HUECOS_PORCENTAJE) huecos.add(c);
+      grid[c] = Math.random() * 100 < MOSAICO_HUECOS_PORCENTAJE ? 1 : 0;
     }
+    const PASADAS_AGRUPAR = 2;
+    const en = (col, row) => {
+      if (col < 0 || col >= cols || row < 0 || row >= rows) return 0;
+      return grid[row * cols + col];
+    };
+    for (let pasada = 0; pasada < PASADAS_AGRUPAR; pasada++) {
+      const siguiente = new Uint8Array(total);
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          let vecinosHueco = 0;
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              if (dr === 0 && dc === 0) continue;
+              vecinosHueco += en(col + dc, row + dr);
+            }
+          }
+          const idx = row * cols + col;
+          // mayoría clara de vecinos vacíos -> hueco; mayoría clara llena
+          // -> recorte; empate (4) mantiene el estado actual (evita que
+          // oscile pasada tras pasada).
+          if (vecinosHueco > 4) siguiente[idx] = 1;
+          else if (vecinosHueco < 4) siguiente[idx] = 0;
+          else siguiente[idx] = grid[idx];
+        }
+      }
+      grid = siguiente;
+    }
+    for (let c = 0; c < total; c++) {
+      if (grid[c]) huecos.add(c);
+    }
+    // Encima de los parches agrupados, salpica algunos huecos sueltos
+    // más -al azar, celda por celda, sin agrupar- entremedio de los
+    // recortes que quedaron llenos: así no son solo manchas prolijas,
+    // también quedan huequitos random dispersos por el resto del mosaico.
+    for (let c = 0; c < total; c++) {
+      if (!huecos.has(c) && Math.random() * 100 < MOSAICO_HUECOS_SUELTOS_PORCENTAJE) {
+        huecos.add(c);
+      }
+    }
+  }
+  mosaicHuecos = huecos;
+
+  // Para los huecos: la misma foto que les tocaría, pero mezclada pixel
+  // a pixel con el color de fondo (putImageData no respeta globalAlpha,
+  // así que la transparencia hay que calcularla a mano). Se cachea por
+  // índice de recorte porque varias celdas de relleno al final pueden
+  // reflejar el mismo recorte (ver el reflejo de `idx` más abajo).
+  const fondoRGB = hexARGB(fondo);
+  const fantasmaCache = new Map();
+  function imgDataFantasma(idx) {
+    if (fantasmaCache.has(idx)) return fantasmaCache.get(idx);
+    const src = tiles[idx].imgData;
+    const out = new ImageData(src.width, src.height);
+    const sD = src.data, oD = out.data;
+    for (let p = 0; p < sD.length; p += 4) {
+      oD[p]     = fondoRGB.r + (sD[p]     - fondoRGB.r) * MOSAICO_HUECOS_OPACIDAD;
+      oD[p + 1] = fondoRGB.g + (sD[p + 1] - fondoRGB.g) * MOSAICO_HUECOS_OPACIDAD;
+      oD[p + 2] = fondoRGB.b + (sD[p + 2] - fondoRGB.b) * MOSAICO_HUECOS_OPACIDAD;
+      oD[p + 3] = 255;
+    }
+    fantasmaCache.set(idx, out);
+    return out;
   }
 
   let i = 0;
@@ -510,7 +608,6 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
   function drawStep() {
     const end = Math.min(i + BATCH, total);
     for (; i < end; i++) {
-      if (huecos.has(i)) continue;      // queda el fondo, sin recorte
       const col = i % cols;
       const row = Math.floor(i / cols);
       // Para las celdas sobrantes de la última fila (i >= n) reflejamos hacia
@@ -519,7 +616,8 @@ function renderFixedMosaic(tiles, tileW, tileH, onDone) {
       // última fila dibujada, y no con los del arranque (el otro extremo).
       let idx = i;
       if (idx >= n) idx = Math.max(0, 2 * n - 1 - idx);
-      ctx.putImageData(tiles[idx].imgData, col * tileW, row * tileH);
+      const data = huecos.has(i) ? imgDataFantasma(idx) : tiles[idx].imgData;
+      ctx.putImageData(data, col * tileW, row * tileH);
     }
     if (i < total) {
       setTimeout(drawStep, 0);
@@ -651,6 +749,72 @@ function stopMosaicDrift() {
     }
   }
   mosaicoDrift = null;
+}
+
+// El mosaico de fondo se arma ANTES de saber dónde van a terminar los
+// poemas (cargan aparte, por YAML, y pueden tardar más o menos que las
+// fotos). Una vez que ambos tienen su posición definitiva -se llama
+// desde revealOnScroll, junto con construirRaicesDesdePoemas- esto pinta
+// con el color de fondo cualquier cuadrado con foto que haya quedado
+// justo debajo del texto de un poema, para que ninguno quede ahí. Las
+// celdas ya vacías (huecos) no se tocan. Se suma a mosaicHuecos y, si el
+// efecto mosaico (desliz) está corriendo, también a su cellPan, para que
+// ninguno de los dos efectos la vuelva a ocupar después.
+//
+// Ojo: un poema (el <article> entero) NO es un rectángulo -el escalonado
+// diagonal (ver renderPoemList) corre cada línea un poco más adentro que
+// la anterior, y cada línea mide lo que mide su propio texto-, así que
+// usar el bounding box de todo el poema tapaba de más: cuadrados que en
+// los hechos no tenían ninguna letra encima. Por eso se mide línea por
+// línea (fecha, título, cada verso) en vez del bloque completo.
+//
+// Otro detalle del mismo problema: con el efecto escritura (ver
+// EFECTO_ESCRITURA) cada línea arranca VACÍA y se va tecleando de a
+// poco, así que su ancho real recién se sabe cuando terminó de
+// escribirse. Por eso esto no se llama una sola vez: se repite por
+// poema, justo cuando ese poema termina de teclearse (ver
+// startTypewriter/runTypewriter) -y de paso, al llamarla acotada a UN
+// article (parámetro opcional `poema`), no hace falta re-revisar los
+// que ya estaban listos-.
+// PARA DESACTIVARLO: poné esto en false. Sin ningún cuadrado vacío en
+// el mosaico (ver MOSAICO_HUECOS_PORCENTAJE en 0), el texto de los
+// poemas queda directamente sobre las fotos, sin ningún espacio en
+// blanco debajo tampoco.
+const OCULTAR_CUADRADOS_BAJO_POEMAS = false;
+
+function ocultarCuadradosBajoPoemas(poema) {
+  if (!OCULTAR_CUADRADOS_BAJO_POEMAS) return;
+  if (!mosaicCanvas || !mosaicHuecos || !mosaicTileWActual || !poemCard) return;
+  const ctx = mosaicCanvas.getContext('2d');
+  const canvasRect = mosaicCanvas.getBoundingClientRect();
+  if (!canvasRect.width) return;
+  // el canvas se muestra a 100% del ancho de pantalla (CSS width:100%)
+  // pero su buffer interno es TARGET_WIDTH (1600, ver renderFixedMosaic):
+  // hay que escalar las coordenadas de pantalla a coordenadas del buffer.
+  const escala = mosaicCanvas.width / canvasRect.width;
+  const cellPan = (mosaicoDrift && mosaicoDrift.cellPan) || null;
+
+  const raiz = poema || poemCard;
+  const lineas = raiz.querySelectorAll('.poem-fecha, .poem-titulo, .poem-linea');
+  lineas.forEach(linea => {
+    if (!linea.textContent.trim()) return; // verso todavía no tecleado (efecto escritura): nada que tapar
+    const r = linea.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const colIni = Math.max(0, Math.floor((r.left - canvasRect.left) * escala / mosaicTileWActual));
+    const colFin = Math.min(mosaicColsActual - 1, Math.ceil((r.right - canvasRect.left) * escala / mosaicTileWActual));
+    const rowIni = Math.max(0, Math.floor((r.top - canvasRect.top) * escala / mosaicTileHActual));
+    const rowFin = Math.min(mosaicRowsActual - 1, Math.ceil((r.bottom - canvasRect.top) * escala / mosaicTileHActual));
+    for (let row = rowIni; row <= rowFin; row++) {
+      for (let col = colIni; col <= colFin; col++) {
+        const idx = row * mosaicColsActual + col;
+        if (mosaicHuecos.has(idx)) continue;
+        mosaicHuecos.add(idx);
+        ctx.fillStyle = mosaicFondoActual;
+        ctx.fillRect(col * mosaicTileWActual, row * mosaicTileHActual, mosaicTileWActual, mosaicTileHActual);
+        if (cellPan) cellPan[idx] = null;
+      }
+    }
+  });
 }
 
 // efecto mosaico: elige una celda al azar y la intercambia con una
@@ -1062,6 +1226,7 @@ function startTypewriter(article) {
 
   if (!EFECTO_ESCRITURA || prefersReducedMotion) {
     targets.forEach(el => { el.textContent = el.dataset.full || ''; });
+    ocultarCuadradosBajoPoemas(article); // ya tiene el texto final: recién ahora se sabe qué tapa
     return;
   }
 
@@ -1205,6 +1370,7 @@ function runTypewriter(article) {
   escribirTodo(targets, gen, article, () => {
     if (article._twGen !== gen) return;
     article._twEstado = 'listo';
+    ocultarCuadradosBajoPoemas(article); // recién tecleado del todo: ya se sabe qué tapa
     programarBorradoOcioso(article);
   });
 }
@@ -1383,6 +1549,13 @@ function renderPoemList(poems) {
 // para desktop-.
 function revealOnScroll() {
   if (!mosaicReady) { revealPendiente = true; return; }
+  // recién acá los poemas y el mosaico tienen su posición/alto
+  // definitivos: a partir de este punto se puede saber qué cuadrados
+  // del mosaico quedan debajo del texto de cada poema (ver
+  // ocultarCuadradosBajoPoemas) y anclar las raíces a su posición real
+  // (ver construirRaicesDesdePoemas).
+  ocultarCuadradosBajoPoemas();
+  construirRaicesDesdePoemas();
   const items = poemCard.querySelectorAll('.poem');
   const revelarTodosJuntos = window.innerWidth <= 820;
   if (revelarTodosJuntos || !('IntersectionObserver' in window)) {
@@ -1847,145 +2020,303 @@ function iniciarDeslizScroll() {
 // =====================================================================
 // EFECTO RAICES (EXPERIMENTAL)
 // ---------------------------------------------------------------------
-// Unas líneas ancladas al piso de la pantalla (no de la página: el
-// canvas es fijo al viewport, ver .raices-capa en style.css) que se
-// estiran hacia donde está el cursor, como raíces creciendo hacia la
-// luz. Cada una tiene un alcance máximo (RAICES_ALCANCE): no persigue
-// el cursor entero, se "achica" cuando el cursor está lejos de su
+// Una raíz por poema, anclada a su propia posición en la página (no a
+// la pantalla: el canvas es tan alto como toda la página -.raices-capa,
+// position:absolute dentro de .contenido- y scrollea junto con los
+// poemas y el mosaico). Cada una se estira hacia donde está el cursor
+// -como una raíz creciendo hacia la luz-, con un alcance máximo: no lo
+// persigue entero, se "achica" cuando el cursor está lejos de su
 // anclaje. Sin cursor (o antes del primer movimiento) no quedan
 // recogidas/invisibles: crecen solas hasta un largo idle y se balancean
-// despacio, así siempre hay raíces en pantalla. No depende del mosaico
-// ni de ninguna otra capa; corre siempre que haya canvas, en cualquier
-// vista.
+// despacio. Con tantas raíces repartidas a lo largo de toda la página,
+// las de poemas cercanos terminan cruzándose/entrelazándose solas.
+//
+// Se arman recién cuando los poemas ya están en el DOM y el mosaico
+// terminó de dibujarse -se llama desde revealOnScroll()-, porque hace
+// falta la posición final de cada <article class="poem">.
 //
 // PARA DESACTIVARLO: poné EFECTO_RAICES en false.
 // =====================================================================
 const EFECTO_RAICES = true;
+const raicesCanvas = document.getElementById('raicesCapa');
+const raicesCtx = raicesCanvas ? raicesCanvas.getContext('2d') : null;
+
+const RAICES_ALCANCE_MIN = 300, RAICES_ALCANCE_SPAN = 320;   // alcance por raíz: 300–620px
+const RAICES_IDLE_LARGO_MIN = 220, RAICES_IDLE_LARGO_SPAN = 180; // largo en reposo (sin cursor): 220–400px
+const RAICES_IDLE_BALANCEO = 18;        // cuánto se mece el idle a los costados, en px (bajo = quedan más fijas)
+const RAICES_PROPORCION_MOVIL = 0.25;   // fracción de raíces que persiguen el cursor; el resto queda quieta (ver RAICES_QUIETA_BALANCEO)
+const RAICES_QUIETA_BALANCEO = 0.35;    // cuánto del balanceo idle les queda a las raíces quietas (0–1): bien amortiguado, casi fijas
+const RAICES_SUAVIZADO = 0.04;         // qué tan rápido la punta alcanza su objetivo (0–1); más bajo = movimiento más suave
+const RAICES_SEGMENTOS = 9;            // puntos intermedios para la curva orgánica
+const RAICES_JITTER = 13;              // ondulado perpendicular al tallo, en px (bajo = quedan más fijas)
+const RAICES_GROSOR = 7;                // ancho de línea, en px
+const RAICES_COLOR = '#ffffff';         // blancas, de verdad (no se invierte ni se mezcla)
+
+// Ramificaciones (fractal): cada raíz es un tronco (nivel 0, el que
+// persigue el cursor) del que nacen ramas (nivel 1), y de esas, otras
+// más chicas (nivel 2). La estructura -ángulos, en qué punto del tramo
+// padre nace cada una, cuánto mide respecto al padre- se decide una
+// sola vez por raíz (ver generarRamas, usado en construirRaicesDesdePoemas)
+// y no cambia cuadro a cuadro: solo el tronco se mueve (hacia el cursor
+// o el idle) y las ramas lo siguen -nacen de un punto de SU tramo actual
+// y apuntan en SU dirección actual más el ángulo fijo-, como ramas de
+// verdad que se mueven con el tronco sin cambiar de forma solas.
+const RAICES_PROFUNDIDAD_MAX = 3;     // 0 = tronco, 1 = ramas, 2 = ramitas, 3 = pelitos finales (como hifas de hongo)
+const RAICES_POR_NIVEL = [3, 2, 2];   // cuántas hijas nacen de un tronco / de una rama, por nivel
+const RAICES_RAMA_ANGULO_MIN = 0.3, RAICES_RAMA_ANGULO_SPAN = 0.6; // separación con el padre, en radianes (rango ancho = ramas más dispersas)
+const RAICES_RAMA_LARGO_FRAC_MIN = 0.45, RAICES_RAMA_LARGO_FRAC_SPAN = 0.35; // largo, fracción del padre
+// en qué punto del tramo padre nace cada hija (0=anclaje, 1=punta):
+// concentrado cerca de la punta -como el micelio de un hongo, que
+// ramifica sobre todo en sus extremos, no a lo largo de todo el hilo-.
+const RAICES_RAMA_NACE_MIN = 0.6, RAICES_RAMA_NACE_SPAN = 0.35;
+
+function generarRamas(nivel) {
+  if (nivel >= RAICES_PROFUNDIDAD_MAX) return [];
+  const n = RAICES_POR_NIVEL[nivel] || 0;
+  const ramas = [];
+  for (let h = 0; h < n; h++) {
+    // alterna lado (izq/der) por índice para que, con más de 2 hijas,
+    // no queden todas apiladas del mismo lado -h par va a la izquierda,
+    // impar a la derecha-.
+    const lado = n > 1 ? (h % 2 === 0 ? -1 : 1) : (Math.random() < 0.5 ? -1 : 1);
+    ramas.push({
+      nace: RAICES_RAMA_NACE_MIN + Math.random() * RAICES_RAMA_NACE_SPAN,
+      angulo: lado * (RAICES_RAMA_ANGULO_MIN + Math.random() * RAICES_RAMA_ANGULO_SPAN),
+      largoFrac: RAICES_RAMA_LARGO_FRAC_MIN + Math.random() * RAICES_RAMA_LARGO_FRAC_SPAN,
+      fase: Math.random() * Math.PI * 2,
+      hijas: generarRamas(nivel + 1),
+    });
+  }
+  return ramas;
+}
+
+let raicesDpr = Math.min(2, window.devicePixelRatio || 1);
+let raices = [];
+// el mouse arranca "sin posición": hasta el primer movimiento, cada
+// raíz usa su objetivo idle (ver raicesFrame()) en vez de perseguir el
+// cursor.
+let raicesMouseX = null, raicesMouseY = null;
+
+// Arma una raíz por cada <article class="poem"> ya en el DOM, anclada
+// cerca de su borde inferior (crece hacia arriba, "a través" del
+// poema). Hay que llamarla recién con el mosaico y los poemas ya
+// definitivos (ver revealOnScroll): antes, sus posiciones todavía
+// pueden moverse.
+function construirRaicesDesdePoemas() {
+  if (!EFECTO_RAICES || !raicesCanvas || !raicesCtx) return;
+  const contenido = document.querySelector('.contenido');
+  if (!contenido) return;
+
+  // Mismo ajuste que el resto de los canvas del sitio: el buffer interno
+  // más grande que el tamaño en pantalla (dpr), para que no se vea
+  // borroso en pantallas retina -y el tamaño en pantalla FIJADO A MANO
+  // (canvas.style.width/height), porque un <canvas> con sus atributos
+  // width/height puestos no se estira solo a lo que pide inset:0 (ver
+  // más abajo el porqué completo, es la misma historia que ya resolvimos
+  // para el tamaño de pantalla).
+  raicesDpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = contenido.clientWidth, h = contenido.offsetHeight;
+  raicesCanvas.width = Math.round(w * raicesDpr);
+  raicesCanvas.height = Math.round(h * raicesDpr);
+  raicesCanvas.style.width = w + 'px';
+  raicesCanvas.style.height = h + 'px';
+  raicesCtx.setTransform(raicesDpr, 0, 0, raicesDpr, 0, 0);
+
+  const canvasRect = raicesCanvas.getBoundingClientRect();
+  const poemas = document.querySelectorAll('#poemCard .poem');
+  raices = Array.from(poemas).map(poem => {
+    const r = poem.getBoundingClientRect();
+    // ancla cerca del borde de abajo del poema, en algún punto de su
+    // ancho (no siempre centrada, para que no queden todas en fila).
+    const anchorX = (r.left - canvasRect.left) + r.width * (0.15 + Math.random() * 0.7);
+    const anchorY = (r.bottom - canvasRect.top) - Math.random() * 20;
+    return {
+      anchorX, anchorY,
+      tipX: anchorX, tipY: anchorY,
+      alcance: RAICES_ALCANCE_MIN + Math.random() * RAICES_ALCANCE_SPAN,
+      idleLargo: RAICES_IDLE_LARGO_MIN + Math.random() * RAICES_IDLE_LARGO_SPAN,
+      fase: Math.random() * Math.PI * 2,   // desfasa el ondulado entre raíces
+      faseIdle: Math.random() * Math.PI * 2, // desfasa el balanceo en reposo
+      // la mayoría de las raíces quedan "quietas" (no persiguen el
+      // cursor, solo el balanceo idle, y bien amortiguado); una
+      // minoría sí son móviles y persiguen el cursor como antes -así
+      // no se mueve todo el fondo a la vez, solo unas pocas-.
+      movil: Math.random() < RAICES_PROPORCION_MOVIL,
+      ramas: generarRamas(0),
+    };
+  });
+
+  if (prefersReducedMotion) raicesDibujarEstatico();
+}
+
+// Con "reducir movimiento" del sistema, nada de animación ni de seguir
+// al cursor: se dejan las raíces dibujadas una sola vez, quietas en su
+// largo idle, y listo (mejor que no mostrar nada).
+function raicesDibujarEstatico() {
+  raices.forEach(r => { r.tipX = r.anchorX; r.tipY = r.anchorY - r.idleLargo; });
+  raices.forEach(r => raicesDibujarRaiz(r, 0));
+}
+
+// Arma los puntos de un tramo (tronco o rama) del punto de partida al de
+// llegada, con un ondulado perpendicular chico (más chico en cada nivel
+// de ramificación) para que no sea una línea recta -más orgánico-. `t`
+// global para que el ondulado respire despacio en vez de quedar
+// estático. Devuelve los puntos REALES de la curva (con el ondulado ya
+// aplicado, no la línea recta de base): así, si nace una rama hija de un
+// punto intermedio, nace exactamente del trazo que se vio dibujado -ver
+// raicesTrazarAfilado, que es quien de verdad lo pinta-.
+function raicesArmarTramo(x0, y0, x1, y1, fase, segmentos, jitterAmt, t) {
+  const dx = x1 - x0, dy = y1 - y0;
+  const largo = Math.hypot(dx, dy);
+  const puntos = [[x0, y0]];
+  if (largo < 1) return puntos;
+  const px = -dy / largo, py = dx / largo;
+
+  for (let s = 1; s <= segmentos; s++) {
+    const f = s / segmentos;
+    const baseX = x0 + dx * f;
+    const baseY = y0 + dy * f;
+    // el ondulado se apaga en las dos puntas (sin(f*PI)) para que nazca
+    // del punto de partida y termine justo en la punta, sin quiebre.
+    const onda = Math.sin(f * Math.PI) * jitterAmt * Math.sin(t * 0.0003 + fase + f * 4);
+    puntos.push([baseX + px * onda, baseY + py * onda]);
+  }
+  return puntos;
+}
+
+// Pinta un tramo como una forma rellena que se va afinando del nacimiento
+// (ancho = grosor) hasta terminar en punta (ancho 0) en la punta -como
+// una hifa de hongo, en vez de una línea de ancho parejo-. En cada punto
+// de la curva calcula la normal perpendicular a la tangente local y
+// desplaza un punto "izquierdo" y uno "derecho" por la mitad del ancho
+// en ese tramo; el contorno de ida (izquierda) más el de vuelta
+// (derecha, al revés) cierra el polígono a rellenar.
+function raicesTrazarAfilado(puntos, grosor) {
+  const n = puntos.length;
+  if (n < 2) return;
+  const izq = new Array(n), der = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const [x, y] = puntos[i];
+    const [nx, ny] = puntos[Math.min(i + 1, n - 1)];
+    const [ax, ay] = puntos[Math.max(i - 1, 0)];
+    const tdx = nx - ax, tdy = ny - ay;
+    const tLargo = Math.hypot(tdx, tdy) || 1;
+    const px = -tdy / tLargo, py = tdx / tLargo;
+    const mitad = (grosor / 2) * (1 - i / (n - 1));
+    izq[i] = [x + px * mitad, y + py * mitad];
+    der[i] = [x - px * mitad, y - py * mitad];
+  }
+  raicesCtx.beginPath();
+  raicesCtx.moveTo(izq[0][0], izq[0][1]);
+  for (let i = 1; i < n; i++) raicesCtx.lineTo(izq[i][0], izq[i][1]);
+  for (let i = n - 1; i >= 0; i--) raicesCtx.lineTo(der[i][0], der[i][1]);
+  raicesCtx.closePath();
+  raicesCtx.fillStyle = RAICES_COLOR;
+  raicesCtx.fill();
+}
+
+// Rota un vector (dx, dy) los radianes que indica `angulo`.
+function raicesRotar(dx, dy, angulo) {
+  const c = Math.cos(angulo), s = Math.sin(angulo);
+  return [dx * c - dy * s, dx * s + dy * c];
+}
+
+// Dibuja un tramo y, recursivamente, las ramas que nacen de él (ver
+// generarRamas/construirRaicesDesdePoemas: la estructura -ángulos,
+// largos, en qué punto nace cada una- ya viene decidida de antes, fija
+// por raíz; acá solo se recalcula DÓNDE cae eso según cómo esté el
+// tramo padre en este cuadro). Cada nivel es más fino que el anterior,
+// pero del mismo blanco sólido -sin ir transparentándose-.
+function raicesDibujarRama(x0, y0, x1, y1, ramasHijas, nivel, fase, t) {
+  const segmentos = Math.max(3, RAICES_SEGMENTOS - nivel * 2);
+  const jitterAmt = RAICES_JITTER * (1 - nivel * 0.35);
+  const grosorFino = Math.max(1, RAICES_GROSOR - nivel);
+  const puntos = raicesArmarTramo(x0, y0, x1, y1, fase, segmentos, jitterAmt, t);
+  raicesTrazarAfilado(puntos, grosorFino);
+
+  const dx = x1 - x0, dy = y1 - y0;
+  const largo = Math.hypot(dx, dy);
+  if (largo < 1 || !ramasHijas || ramasHijas.length === 0) return;
+  const dirX = dx / largo, dirY = dy / largo;
+
+  ramasHijas.forEach(rama => {
+    const idx = Math.min(puntos.length - 1, Math.round(rama.nace * (puntos.length - 1)));
+    const [bx, by] = puntos[idx];
+    const [hdx, hdy] = raicesRotar(dirX, dirY, rama.angulo);
+    const largoHija = largo * rama.largoFrac;
+    raicesDibujarRama(bx, by, bx + hdx * largoHija, by + hdy * largoHija, rama.hijas, nivel + 1, rama.fase, t);
+  });
+}
+
+function raicesDibujarRaiz(r, t) {
+  raicesDibujarRama(r.anchorX, r.anchorY, r.tipX, r.tipY, r.ramas, 0, r.fase, t);
+  raicesCtx.globalAlpha = 1; // no se filtre al resto del dibujado
+}
+
 (function () {
-  if (!EFECTO_RAICES) return;
-  const canvas = document.getElementById('raicesCapa');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
+  if (!EFECTO_RAICES || !raicesCanvas || !raicesCtx) return;
 
-  const CANTIDAD = 7;
-  const ALCANCE_MIN = 240, ALCANCE_SPAN = 280;   // alcance por raíz: 240–520px
-  const IDLE_LARGO_MIN = 200, IDLE_LARGO_SPAN = 180; // largo en reposo (sin cursor): 200–380px
-  const IDLE_BALANCEO = 40;        // cuánto se mece el idle a los costados, en px
-  const SUAVIZADO = 0.055;        // qué tan rápido la punta alcanza su objetivo (0–1)
-  const SEGMENTOS = 7;            // puntos intermedios para la curva orgánica
-  const JITTER = 26;              // ondulado perpendicular al tallo, en px
-  const GROSOR = 3;                // ancho de línea, en px
-  const COLOR = 'rgba(255, 255, 255, 0.55)'; // blancas
-
-  let dpr = Math.min(2, window.devicePixelRatio || 1);
-  let raices = [];
-  // el mouse arranca "sin posición": hasta el primer movimiento, cada
-  // raíz usa su objetivo idle (ver frame()) en vez de perseguir el
-  // cursor.
-  let mouseX = null, mouseY = null;
-
-  function crearRaices() {
-    const w = canvas.clientWidth, h = canvas.clientHeight;
-    raices = [];
-    for (let i = 0; i < CANTIDAD; i++) {
-      const anchorX = (w / (CANTIDAD + 1)) * (i + 1) + (Math.random() - 0.5) * 40;
-      raices.push({
-        anchorX, anchorY: h,
-        tipX: anchorX, tipY: h,
-        alcance: ALCANCE_MIN + Math.random() * ALCANCE_SPAN,
-        idleLargo: IDLE_LARGO_MIN + Math.random() * IDLE_LARGO_SPAN,
-        fase: Math.random() * Math.PI * 2,   // desfasa el ondulado entre raíces
-        faseIdle: Math.random() * Math.PI * 2, // desfasa el balanceo en reposo
-      });
-    }
-  }
-
-  // Con "reducir movimiento" del sistema, nada de animación ni de seguir
-  // al cursor: se dejan las raíces dibujadas una sola vez, quietas en su
-  // largo idle, y listo (mejor que no mostrar nada, como antes).
-  function dibujarEstatico() {
-    raices.forEach(r => { r.tipX = r.anchorX; r.tipY = r.anchorY - r.idleLargo; });
-    ctx.strokeStyle = COLOR;
-    ctx.lineWidth = GROSOR;
-    ctx.lineCap = 'round';
-    raices.forEach(r => dibujarRaiz(r, 0));
-  }
-
-  function redimensionar() {
-    dpr = Math.min(2, window.devicePixelRatio || 1);
-    canvas.width = Math.round(window.innerWidth * dpr);
-    canvas.height = Math.round(window.innerHeight * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    crearRaices();
-    if (prefersReducedMotion) dibujarEstatico();
-  }
-  redimensionar();
-  window.addEventListener('resize', redimensionar);
+  // Rearma todo si la ventana cambia de tamaño (las posiciones de los
+  // poemas pueden correrse): debounced, como el resto de los resize
+  // "caros" del sitio.
+  let raicesResizeTimer = null;
+  window.addEventListener('resize', () => {
+    if (raices.length === 0) return; // todavía no hay poemas: nada que rearmar
+    clearTimeout(raicesResizeTimer);
+    raicesResizeTimer = setTimeout(() => {
+      ocultarCuadradosBajoPoemas(); // los poemas pueden haber quedado sobre otros cuadrados
+      construirRaicesDesdePoemas();
+    }, 250);
+  }, { passive: true });
 
   if (prefersReducedMotion) return;
 
+  // clientX/clientY son relativos a la ventana; hay que restarles dónde
+  // está el canvas AHORA (que se mueve con el scroll, al ser absolute
+  // dentro de .contenido) para tener la posición en el mismo sistema de
+  // coordenadas que usan las raíces -el de la página, no el de la
+  // pantalla-.
   window.addEventListener('pointermove', (e) => {
-    mouseX = e.clientX;
-    mouseY = e.clientY;
+    const rect = raicesCanvas.getBoundingClientRect();
+    raicesMouseX = e.clientX - rect.left;
+    raicesMouseY = e.clientY - rect.top;
   }, { passive: true });
   // si el cursor se va de la ventana, las raíces se recogen de nuevo.
-  window.addEventListener('pointerleave', () => { mouseX = null; mouseY = null; });
+  window.addEventListener('pointerleave', () => { raicesMouseX = null; raicesMouseY = null; });
 
-  // Dibuja una raíz como una curva suave del anclaje a la punta, con un
-  // ondulado perpendicular chico (JITTER) para que no sea una línea
-  // recta -más orgánico-. `t` global para que el ondulado respire
-  // despacio en vez de quedar estático.
-  function dibujarRaiz(r, t) {
-    const dx = r.tipX - r.anchorX, dy = r.tipY - r.anchorY;
-    const largo = Math.hypot(dx, dy);
-    if (largo < 1) return;
-    // perpendicular unitario al tallo, para desplazar los puntos intermedios
-    const px = -dy / largo, py = dx / largo;
-
-    ctx.beginPath();
-    ctx.moveTo(r.anchorX, r.anchorY);
-    for (let s = 1; s <= SEGMENTOS; s++) {
-      const f = s / SEGMENTOS;
-      const baseX = r.anchorX + dx * f;
-      const baseY = r.anchorY + dy * f;
-      // el ondulado se apaga en las dos puntas (sin(f*PI)) para que nazca
-      // del anclaje y termine justo en la punta, sin quiebre.
-      const onda = Math.sin(f * Math.PI) * JITTER * Math.sin(t * 0.0006 + r.fase + f * 4);
-      ctx.lineTo(baseX + px * onda, baseY + py * onda);
-    }
-    ctx.stroke();
-  }
-
-  function frame(t) {
-    const w = canvas.clientWidth, h = canvas.clientHeight;
-    ctx.clearRect(0, 0, w, h);
-    ctx.strokeStyle = COLOR;
-    ctx.lineWidth = GROSOR;
-    ctx.lineCap = 'round';
+  function raicesFrame(t) {
+    const w = raicesCanvas.clientWidth, h = raicesCanvas.clientHeight;
+    raicesCtx.clearRect(0, 0, w, h);
 
     raices.forEach(r => {
       let targetX, targetY;
-      if (mouseX !== null) {
-        const dx = mouseX - r.anchorX, dy = mouseY - r.anchorY;
+      // solo las raíces "móviles" persiguen el cursor; las demás (la
+      // mayoría) se quedan siempre en su objetivo idle, bien amortiguado
+      // -r.movil se decide una sola vez por raíz, ver construirRaicesDesdePoemas-.
+      if (raicesMouseX !== null && r.movil) {
+        const dx = raicesMouseX - r.anchorX, dy = raicesMouseY - r.anchorY;
         const dist = Math.hypot(dx, dy);
         const alcanceReal = Math.min(dist, r.alcance);
         const ang = Math.atan2(dy, dx);
         targetX = r.anchorX + Math.cos(ang) * alcanceReal;
         targetY = r.anchorY + Math.sin(ang) * alcanceReal;
       } else {
-        // sin cursor (o antes del primer movimiento): crece derecho hacia
-        // arriba hasta su largo idle, con un balanceo lento a los costados.
-        targetX = r.anchorX + Math.sin(t * 0.00035 + r.faseIdle) * IDLE_BALANCEO;
+        // sin cursor, antes del primer movimiento, o raíz no móvil: crece
+        // derecho hacia arriba hasta su largo idle, con un balanceo lento
+        // a los costados -más chico todavía si la raíz no es móvil, para
+        // que se note quieta frente a las pocas que sí persiguen el cursor-.
+        const balanceo = RAICES_IDLE_BALANCEO * (r.movil ? 1 : RAICES_QUIETA_BALANCEO);
+        targetX = r.anchorX + Math.sin(t * 0.00015 + r.faseIdle) * balanceo;
         targetY = r.anchorY - r.idleLargo;
       }
-      r.tipX += (targetX - r.tipX) * SUAVIZADO;
-      r.tipY += (targetY - r.tipY) * SUAVIZADO;
-      dibujarRaiz(r, t);
+      r.tipX += (targetX - r.tipX) * RAICES_SUAVIZADO;
+      r.tipY += (targetY - r.tipY) * RAICES_SUAVIZADO;
+      raicesDibujarRaiz(r, t);
     });
 
-    requestAnimationFrame(frame);
+    requestAnimationFrame(raicesFrame);
   }
-  requestAnimationFrame(frame);
+  requestAnimationFrame(raicesFrame);
 })();
 
 function renderFlowMosaic(tiles, rowHeight, minWidth, maxWidth, onDone) {
