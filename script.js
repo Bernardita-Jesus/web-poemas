@@ -524,7 +524,9 @@ function intercalarFotos() {
 // plantas: recortes con transparencia, fondo ya quitado -ver script de
 // procesamiento, no en este repo-) en tres tipos de hueco:
 //   - ENCIMA de una foto ya puesta por intercalarFotos, asomando por
-//     arriba/abajo o izq/der de su borde.
+//     arriba/abajo o izq/der de su borde. NO en todas las fotos -ver
+//     el .filter() más abajo-: la prioridad son los espacios vacíos,
+//     así que esto es secundario/ocasional.
 //   - AL COSTADO VACÍO de un poema que quedó SIN foto al lado (no
 //     siempre alcanzan las fotos para todos los poemas) -el costado
 //     contrario a su margen, donde no hay nada más-.
@@ -541,16 +543,22 @@ function intercalarFotos() {
 // queda exactamente igual que sin ninguna planta. Rotación al azar por
 // planta (--rot) para que no se vean todas "derechas".
 //
-// Van en TODOS los huecos (todas las fotos, todos los poemas sin foto
-// al lado, y todas las filas), no en unos pocos al azar: como hay menos
-// fotos de planta que huecos, se repiten -cada hueco elige una al azar
-// de la lista, sin descartarla para los demás-.
+// Los espacios vacíos (poemas sin foto, costado de cada fila) llevan
+// planta SIEMPRE -son la prioridad-; encima de una foto es la excepción
+// (chance baja). Como hay menos fotos de planta que huecos, se repiten
+// -cada hueco elige una al azar de la lista, sin descartarla para los
+// demás-.
 function intercalarPlantas() {
   const plantas = (SEASON_CFG && SEASON_CFG.plantas) || [];
   if (plantas.length === 0) return;
 
   const objetivos = [
-    ...Array.from(poemCard.querySelectorAll('.poem-foto')).map(el => ({ el, tipo: 'foto' })),
+    // ENCIMA de una foto: NO en todas -la prioridad son los espacios
+    // vacíos de abajo (poema sin foto, costado de cada fila)-, así que
+    // cada foto tiene solo una chance baja de llevar una.
+    ...Array.from(poemCard.querySelectorAll('.poem-foto'))
+      .filter(() => Math.random() < 0.35)
+      .map(el => ({ el, tipo: 'foto' })),
     ...Array.from(poemCard.querySelectorAll(':scope > .poem')).map(el => ({ el, tipo: 'poema' })),
     ...Array.from(poemCard.querySelectorAll(':scope > .poem-con-foto')).map(el => ({ el, tipo: 'fila' })),
   ];
@@ -559,7 +567,16 @@ function intercalarPlantas() {
   objetivos.forEach(({ el: objetivo, tipo }) => {
     const ruta = plantas[Math.floor(Math.random() * plantas.length)];
     const fig = document.createElement('figure');
-    fig.style.setProperty('--rot', (Math.random() * 30 - 15).toFixed(1) + 'deg');
+    // La mayoría apenas inclinada (-15 a 15°); 1 de cada 4 -pedido
+    // explícito- bien acostada, cerca de la horizontal (75 a 105°, a
+    // cualquiera de los dos lados), para que no se vean todas "paradas".
+    const rot = Math.random() < 0.25
+      ? (Math.random() < 0.5 ? 1 : -1) * (75 + Math.random() * 30)
+      : Math.random() * 30 - 15;
+    fig.style.setProperty('--rot', rot.toFixed(1) + 'deg');
+    // planta-otono-01 (la más clara) un poco más grande que las otras
+    // dos -pedido explícito-, ver .poem-planta-01 en style.css.
+    const esPlanta01 = /planta-otono-01\.png$/.test(ruta);
 
     if (tipo === 'foto') {
       const vertical = Math.random() < 0.5 ? 'arriba' : 'abajo';
@@ -582,6 +599,7 @@ function intercalarPlantas() {
       const lado = esIzq ? 'der' : 'izq';
       fig.className = `poem-planta poem-planta-afuera-${lado}`;
     }
+    if (esPlanta01) fig.classList.add('poem-planta-01');
 
     const img = document.createElement('img');
     img.src = ruta;

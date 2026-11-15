@@ -8,8 +8,9 @@
   --text: #4a3f28;
   --text-dim: #96895f;
   /* Alto de UNA fila de la barra superior, en desktop: una fracción del
-     ancho de pantalla. Lo usa el alto de los botones (.topbar-btn). */
-  --barra-alto: calc(100vw / 23 / 2);
+     ancho de pantalla. Lo usa el alto de los botones (.topbar-btn).
+     /1.6 (antes /2): un poco más alta -pedido explícito-. */
+  --barra-alto: calc(100vw / 23 / 1.6);
   /* Alto real de una fila de LA BARRA (.topbar-btn). En desktop es el
      mismo --barra-alto; en pantallas angostas se pisa con un valor fijo
      más cómodo para tocar (ver @media más abajo), porque ahí
@@ -277,11 +278,12 @@ body {
    Es position: absolute A PROPÓSITO en los dos casos: así NO cuenta
    como un elemento más en la fila -no agrega su propio espacio ni
    corre nada-, la separación entre poemas/fotos queda igual que sin
-   ninguna planta. --rot (puesta por script.js, grados al azar entre
-   -15 y 15) le da a cada una una leve rotación, menos prolija. */
+   ninguna planta. --rot (puesta por script.js) le da a cada una una
+   rotación al azar: la mayoría apenas inclinada (-15 a 15°), y algunas
+   -pedido explícito- bien acostadas, cerca de la horizontal. */
 .poem-planta {
   position: absolute;
-  width: min(260px, 60%);
+  width: min(295px, 68%);
   /* bien por encima de cualquier otra cosa del contenido (poemas,
      fotos, el velo), así una planta nunca queda tapada por la fila de
      al lado ni por otra planta vecina. Por debajo sí de la barra
@@ -292,19 +294,29 @@ body {
   transition: opacity .8s ease;
   overflow-anchor: none;
 }
-.poem-planta-arriba { top: -14%; }
-.poem-planta-abajo { bottom: -14%; }
-.poem-planta-izq { left: -10%; }
-.poem-planta-der { right: -10%; }
+/* encima de una foto (ver intercalarPlantas en script.js): bien hacia
+   el borde -no más chica, sino corrida más al extremo-, así tapa menos
+   foto y asoma más hacia afuera. */
+.poem-planta-arriba { top: -34%; }
+.poem-planta-abajo { bottom: -34%; }
+.poem-planta-izq { left: -24%; }
+.poem-planta-der { right: -24%; }
 /* afuera del poema (no encima de su texto): pegada a su costado vacío,
    un poco más angosta que las que van sobre una foto. */
 .poem-planta-afuera-izq,
 .poem-planta-afuera-der {
   top: 8%;
-  width: min(210px, 45vw);
+  width: min(235px, 50vw);
 }
 .poem-planta-afuera-izq { right: 100%; margin-right: 20px; }
 .poem-planta-afuera-der { left: 100%; margin-left: 20px; }
+/* planta-otono-01 (la más clara, ver intercalarPlantas en script.js):
+   un poco más grande que las otras dos -pedido explícito-. Selector
+   combinado (.poem-planta-01 junto con -afuera-izq/-der) para pisar
+   ese ancho más angosto sin depender del orden en la hoja. */
+.poem-planta-01 { width: min(340px, 78%); }
+.poem-planta-01.poem-planta-afuera-izq,
+.poem-planta-01.poem-planta-afuera-der { width: min(270px, 58vw); }
 .poem-planta.visible {
   opacity: 1;
 }
@@ -318,7 +330,8 @@ body {
   .poem-planta { transition: opacity .3s ease; }
 }
 @media (max-width: 820px) {
-  .poem-planta { width: min(190px, 55%); }
+  .poem-planta { width: min(215px, 62%); }
+  .poem-planta-01 { width: min(250px, 71%); }
   /* no hay costado vacío que valga en celular (el poema ya ocupa casi
      todo el ancho): se esconde en vez de desbordar la pantalla. */
   .poem-planta-afuera-izq,
@@ -594,11 +607,12 @@ body[data-estacion]::before {
    script.js) sepa cuánto lugar ocupa la barra entera ahora, no solo una
    fila. --topbar-fila-alto también se pisa: en desktop sale de
    --barra-alto, pero acá eso da filas de apenas ~15px, muy finas para
-   tocar; 44px es el mínimo recomendado de tap target (iOS/Android). */
+   tocar; 44px era el mínimo recomendado de tap target (iOS/Android),
+   52px un poco más alto -pedido explícito-. */
 @media (max-width: 820px) {
   :root {
     --topbar-filas: 3;
-    --topbar-fila-alto: 44px;
+    --topbar-fila-alto: 52px;
   }
   .topbar {
     display: grid;
