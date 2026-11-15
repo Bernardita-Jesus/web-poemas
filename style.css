@@ -148,6 +148,10 @@ body {
 }
 
 .poem {
+  /* relative: ancla a una .poem-planta puesta en su costado vacío (ver
+     intercalarPlantas en script.js y .poem-planta-afuera-* más abajo),
+     cuando el poema quedó sin foto al lado. */
+  position: relative;
   pointer-events: auto;
   max-width: min(680px, 90vw);
   color: #6e2b35;
@@ -215,6 +219,9 @@ body {
 .poem-con-foto .poem { max-width: none; flex: 1 1 0; }
 
 .poem-foto {
+  /* relative: ancla a .poem-planta (ver más abajo), que se posiciona
+     absolute contra ESTA foto -no contra la página-. */
+  position: relative;
   margin: 0;
   flex: 1 1 0;
   opacity: 0;
@@ -229,8 +236,17 @@ body {
 .poem-foto img {
   display: block;
   width: 100%;
-  height: auto;
-  box-shadow: 0 24px 50px -22px rgba(150, 125, 40, .4);
+  /* mismo tamaño (proporción) para todas, recortando lo que sobre: sin
+     esto, cada foto tiene su propia relación de aspecto (según cómo
+     salió la toma) y quedaban todas de alto distinto. */
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  /* drop-shadow (no box-shadow): sigue el contorno real de la imagen.
+     Para una foto rectangular normal da casi lo mismo, pero para
+     .poem-planta (recortes con transparencia, más abajo) importa: un
+     box-shadow dibujaría un rectángulo de sombra alrededor de todo el
+     recuadro, aunque la mayor parte sea transparente. */
+  filter: drop-shadow(0 18px 26px rgba(150, 125, 40, .4));
 }
 @media (prefers-reduced-motion: reduce) {
   .poem-foto { transition: opacity .3s ease; transform: none; }
@@ -238,6 +254,64 @@ body {
 @media (max-width: 820px) {
   .poem-con-foto { flex-direction: column; align-items: stretch; gap: 24px; }
   .poem-con-foto .poem-foto { max-width: none; }
+}
+
+/* "Planta" (ver intercalarPlantas en script.js): un recorte chico, con
+   transparencia, puesto en uno de dos huecos:
+     - ENCIMA de una foto ya puesta por intercalarFotos (.poem-foto,
+       position: relative más arriba), asomando por arriba/abajo o
+       izq/der de su borde (.poem-planta-arriba/-abajo/-izq/-der).
+     - AL COSTADO VACÍO de un poema que quedó sin foto al lado (.poem,
+       también position: relative), bien afuera de su propio texto
+       (.poem-planta-afuera-izq/-der): no se superpone al texto, usa el
+       espacio que quedaba sin nada.
+   Es position: absolute A PROPÓSITO en los dos casos: así NO cuenta
+   como un elemento más en la fila -no agrega su propio espacio ni
+   corre nada-, la separación entre poemas/fotos queda igual que sin
+   ninguna planta. --rot (puesta por script.js, grados al azar entre
+   -15 y 15) le da a cada una una leve rotación, menos prolija. */
+.poem-planta {
+  position: absolute;
+  width: min(190px, 48%);
+  z-index: 2;
+  opacity: 0;
+  transform: rotate(var(--rot, 0deg));
+  transition: opacity .8s ease;
+  overflow-anchor: none;
+}
+.poem-planta-arriba { top: -14%; }
+.poem-planta-abajo { bottom: -14%; }
+.poem-planta-izq { left: -10%; }
+.poem-planta-der { right: -10%; }
+/* afuera del poema (no encima de su texto): pegada a su costado vacío,
+   un poco más angosta que las que van sobre una foto. */
+.poem-planta-afuera-izq,
+.poem-planta-afuera-der {
+  top: 8%;
+  width: min(150px, 38vw);
+}
+.poem-planta-afuera-izq { right: 100%; margin-right: 20px; }
+.poem-planta-afuera-der { left: 100%; margin-left: 20px; }
+.poem-planta.visible {
+  opacity: 1;
+}
+.poem-planta img {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 14px 20px rgba(0, 0, 0, .25));
+}
+@media (prefers-reduced-motion: reduce) {
+  .poem-planta { transition: opacity .3s ease; }
+}
+@media (max-width: 820px) {
+  .poem-planta { width: min(140px, 40%); }
+  /* no hay costado vacío que valga en celular (el poema ya ocupa casi
+     todo el ancho): se esconde en vez de desbordar la pantalla. */
+  .poem-planta-afuera-izq,
+  .poem-planta-afuera-der {
+    display: none;
+  }
 }
 
 .poem-fecha {

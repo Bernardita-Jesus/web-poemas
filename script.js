@@ -33,6 +33,14 @@ const ESTACIONES = {
       'assets/imagenes/otono-08.jpeg',
       'assets/imagenes/otono-09.jpeg',
     ],
+    // Plantas prensadas (fondo ya quitado, PNG con transparencia): van
+    // aparte de "fotos", no se mezclan con esas -ni intercalarFotos ni
+    // el pase de la pestaña "Estaciones" las tocan todavía-.
+    plantas: [
+      'assets/imagenes/planta-otono-01.png',
+      'assets/imagenes/planta-otono-02.png',
+      'assets/imagenes/planta-otono-03.png',
+    ],
   },
   invierno: {
     // nombre y año para el rótulo del pase de fotos de la pestaña
@@ -452,6 +460,7 @@ function renderPoemList(poems) {
     });
 
   intercalarFotos();
+  intercalarPlantas();
   revealOnScroll();
 }
 
@@ -511,6 +520,60 @@ function intercalarFotos() {
   });
 }
 
+// Reparte las "plantas" de la estación actual (ESTACIONES.<estacion>.
+// plantas: recortes con transparencia, fondo ya quitado -ver script de
+// procesamiento, no en este repo-) en dos tipos de hueco:
+//   - ENCIMA de una foto ya puesta por intercalarFotos, asomando por
+//     arriba/abajo o izq/der de su borde.
+//   - AL COSTADO VACÍO de un poema que quedó SIN foto al lado (no
+//     siempre alcanzan las fotos para todos los poemas) -el costado
+//     contrario a su margen, donde no hay nada más-.
+// En los dos casos la planta es hija del objetivo (position: absolute,
+// ver .poem-foto/.poem position:relative y .poem-planta en style.css):
+// así NO cuenta como un elemento más en la fila -no suma su propio
+// "gap" ni corre nada- y la separación entre poemas/fotos queda
+// exactamente igual que sin ninguna planta. Rotación al azar por
+// planta (--rot) para que no se vean todas "derechas".
+//
+// Van en TODOS los huecos (todas las fotos y todos los poemas sin foto
+// al lado), no en unos pocos al azar: como hay menos fotos de planta
+// que huecos, se repiten -cada hueco elige una al azar de la lista,
+// sin descartarla para los demás-.
+function intercalarPlantas() {
+  const plantas = (SEASON_CFG && SEASON_CFG.plantas) || [];
+  if (plantas.length === 0) return;
+
+  const objetivos = [
+    ...Array.from(poemCard.querySelectorAll('.poem-foto')).map(el => ({ el, tipo: 'foto' })),
+    ...Array.from(poemCard.querySelectorAll(':scope > .poem')).map(el => ({ el, tipo: 'poema' })),
+  ];
+  if (objetivos.length === 0) return;
+
+  objetivos.forEach(({ el: objetivo, tipo }) => {
+    const ruta = plantas[Math.floor(Math.random() * plantas.length)];
+    const fig = document.createElement('figure');
+    fig.style.setProperty('--rot', (Math.random() * 30 - 15).toFixed(1) + 'deg');
+
+    if (tipo === 'foto') {
+      const vertical = Math.random() < 0.5 ? 'arriba' : 'abajo';
+      const horizontal = Math.random() < 0.5 ? 'izq' : 'der';
+      fig.className = `poem-planta poem-planta-${vertical} poem-planta-${horizontal}`;
+    } else {
+      // poema sin foto al lado: va al costado vacío, el contrario al
+      // margen propio del poema (ver .poem-izq/.poem-der).
+      const lado = objetivo.classList.contains('poem-izq') ? 'der' : 'izq';
+      fig.className = `poem-planta poem-planta-afuera-${lado}`;
+    }
+
+    const img = document.createElement('img');
+    img.src = ruta;
+    img.alt = '';
+    img.loading = 'lazy';
+    fig.appendChild(img);
+    objetivo.appendChild(fig);
+  });
+}
+
 // Muestra cada poema (título, fecha y versos) con un fundido cuando entra
 // en el viewport.
 //
@@ -519,7 +582,7 @@ function intercalarFotos() {
 // cada uno entra en pantalla al scrollear -esto último es lo que hace
 // el IntersectionObserver de más abajo, pensado para desktop-.
 function revealOnScroll() {
-  const items = poemCard.querySelectorAll('.poem, .poem-foto');
+  const items = poemCard.querySelectorAll('.poem, .poem-foto, .poem-planta');
   const revelarTodosJuntos = window.innerWidth <= 820;
   if (revelarTodosJuntos || !('IntersectionObserver' in window)) {
     items.forEach(el => {
