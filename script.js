@@ -563,7 +563,16 @@ function intercalarPlantas() {
 
     if (tipo === 'foto') {
       const vertical = Math.random() < 0.5 ? 'arriba' : 'abajo';
-      const horizontal = Math.random() < 0.5 ? 'izq' : 'der';
+      // El lado horizontal NO es al azar: la fila que contiene esta foto
+      // puede tener su propia planta "afuera" (ver más abajo) del lado
+      // contrario a su margen. Si esta planta asomara hacia ESE mismo
+      // lado, las dos quedarían superpuestas/cruzadas ahí -se ve como
+      // una sola planta rara, como "acostada"-. Por eso siempre asoma
+      // hacia ADENTRO de la fila (el lado donde está el poema).
+      const fila = objetivo.closest('.poem-con-foto');
+      const horizontal = fila
+        ? (fila.classList.contains('poem-con-foto-izq') ? 'izq' : 'der')
+        : (Math.random() < 0.5 ? 'izq' : 'der');
       fig.className = `poem-planta poem-planta-${vertical} poem-planta-${horizontal}`;
     } else {
       // poema sin foto, o fila entera: van al costado vacío, el
