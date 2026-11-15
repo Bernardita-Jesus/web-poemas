@@ -236,7 +236,13 @@ body {
   opacity: 1;
   transform: none;
 }
-.poem-foto img {
+/* > (hijo directo), no descendiente: una .poem-planta puesta ENCIMA de
+   la foto (ver intercalarPlantas en script.js) queda anidada adentro de
+   este .poem-foto, con su propio <img> más abajo en el árbol -no hijo
+   directo-. Con un selector descendiente ("poem-foto img") esta regla
+   le pisaba el tamaño/recorte a la planta también: la forzaba a una
+   caja 4:3 y la recortaba (se veía "cortada"). */
+.poem-foto > img {
   display: block;
   width: 100%;
   /* mismo tamaño (proporción) para todas, recortando lo que sobre: sin
