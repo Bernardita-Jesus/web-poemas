@@ -522,23 +522,29 @@ function intercalarFotos() {
 
 // Reparte las "plantas" de la estación actual (ESTACIONES.<estacion>.
 // plantas: recortes con transparencia, fondo ya quitado -ver script de
-// procesamiento, no en este repo-) en dos tipos de hueco:
+// procesamiento, no en este repo-) en tres tipos de hueco:
 //   - ENCIMA de una foto ya puesta por intercalarFotos, asomando por
 //     arriba/abajo o izq/der de su borde.
 //   - AL COSTADO VACÍO de un poema que quedó SIN foto al lado (no
 //     siempre alcanzan las fotos para todos los poemas) -el costado
 //     contrario a su margen, donde no hay nada más-.
-// En los dos casos la planta es hija del objetivo (position: absolute,
-// ver .poem-foto/.poem position:relative y .poem-planta en style.css):
-// así NO cuenta como un elemento más en la fila -no suma su propio
-// "gap" ni corre nada- y la separación entre poemas/fotos queda
-// exactamente igual que sin ninguna planta. Rotación al azar por
+//   - AL COSTADO VACÍO de cada FILA (poema solo, o poema+foto): cada
+//     fila lleva el mismo margen de orilla que un poema suelto (ver
+//     .poem-izq/.poem-der y .poem-con-foto-izq/-der en style.css), así
+//     que en pantallas anchas el lado contrario a ese margen queda
+//     vacío de punta a punta -mucho más ancho que el hueco de "poema
+//     sin foto" de arriba, que es solo al lado del texto-.
+// En los tres casos la planta es hija del objetivo (position: absolute,
+// ver .poem-foto/.poem/.poem-con-foto position:relative y .poem-planta
+// en style.css): así NO cuenta como un elemento más en la fila -no suma
+// su propio "gap" ni corre nada- y la separación entre poemas/fotos
+// queda exactamente igual que sin ninguna planta. Rotación al azar por
 // planta (--rot) para que no se vean todas "derechas".
 //
-// Van en TODOS los huecos (todas las fotos y todos los poemas sin foto
-// al lado), no en unos pocos al azar: como hay menos fotos de planta
-// que huecos, se repiten -cada hueco elige una al azar de la lista,
-// sin descartarla para los demás-.
+// Van en TODOS los huecos (todas las fotos, todos los poemas sin foto
+// al lado, y todas las filas), no en unos pocos al azar: como hay menos
+// fotos de planta que huecos, se repiten -cada hueco elige una al azar
+// de la lista, sin descartarla para los demás-.
 function intercalarPlantas() {
   const plantas = (SEASON_CFG && SEASON_CFG.plantas) || [];
   if (plantas.length === 0) return;
@@ -546,6 +552,7 @@ function intercalarPlantas() {
   const objetivos = [
     ...Array.from(poemCard.querySelectorAll('.poem-foto')).map(el => ({ el, tipo: 'foto' })),
     ...Array.from(poemCard.querySelectorAll(':scope > .poem')).map(el => ({ el, tipo: 'poema' })),
+    ...Array.from(poemCard.querySelectorAll(':scope > .poem-con-foto')).map(el => ({ el, tipo: 'fila' })),
   ];
   if (objetivos.length === 0) return;
 
@@ -559,9 +566,11 @@ function intercalarPlantas() {
       const horizontal = Math.random() < 0.5 ? 'izq' : 'der';
       fig.className = `poem-planta poem-planta-${vertical} poem-planta-${horizontal}`;
     } else {
-      // poema sin foto al lado: va al costado vacío, el contrario al
-      // margen propio del poema (ver .poem-izq/.poem-der).
-      const lado = objetivo.classList.contains('poem-izq') ? 'der' : 'izq';
+      // poema sin foto, o fila entera: van al costado vacío, el
+      // contrario al margen propio (.poem-izq/-der para un poema
+      // suelto, .poem-con-foto-izq/-der para una fila).
+      const esIzq = objetivo.classList.contains('poem-izq') || objetivo.classList.contains('poem-con-foto-izq');
+      const lado = esIzq ? 'der' : 'izq';
       fig.className = `poem-planta poem-planta-afuera-${lado}`;
     }
 

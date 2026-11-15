@@ -203,6 +203,9 @@ body {
    estirada a todo el ancho de .poem-card, poema Y foto pegados al
    borde de la pantalla. */
 .poem-con-foto {
+  /* relative: ancla a una .poem-planta puesta en su costado vacío (ver
+     intercalarPlantas en script.js), igual que .poem/.poem-foto. */
+  position: relative;
   display: flex;
   align-items: center;
   gap: 5vw;
@@ -272,8 +275,12 @@ body {
    -15 y 15) le da a cada una una leve rotación, menos prolija. */
 .poem-planta {
   position: absolute;
-  width: min(190px, 48%);
-  z-index: 2;
+  width: min(260px, 60%);
+  /* bien por encima de cualquier otra cosa del contenido (poemas,
+     fotos, el velo), así una planta nunca queda tapada por la fila de
+     al lado ni por otra planta vecina. Por debajo sí de la barra
+     superior (20) y la barra de scroll propia (15). */
+  z-index: 10;
   opacity: 0;
   transform: rotate(var(--rot, 0deg));
   transition: opacity .8s ease;
@@ -288,7 +295,7 @@ body {
 .poem-planta-afuera-izq,
 .poem-planta-afuera-der {
   top: 8%;
-  width: min(150px, 38vw);
+  width: min(210px, 45vw);
 }
 .poem-planta-afuera-izq { right: 100%; margin-right: 20px; }
 .poem-planta-afuera-der { left: 100%; margin-left: 20px; }
@@ -305,7 +312,7 @@ body {
   .poem-planta { transition: opacity .3s ease; }
 }
 @media (max-width: 820px) {
-  .poem-planta { width: min(140px, 40%); }
+  .poem-planta { width: min(190px, 55%); }
   /* no hay costado vacío que valga en celular (el poema ya ocupa casi
      todo el ancho): se esconde en vez de desbordar la pantalla. */
   .poem-planta-afuera-izq,
