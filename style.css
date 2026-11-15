@@ -7,23 +7,18 @@
   --amber-text: #4a3c12;
   --text: #4a3f28;
   --text-dim: #96895f;
-  /* Alto de UNA fila de la barra superior = alto de un recorte del
-     mosaico. El canvas se reparte en 23 columnas y cada recorte mide
-     media columna de alto (tileW 70 : tileH 36 en index.html). Lo usa
-     el alto de los botones (.topbar-btn) y .poem-card (bottom, para
-     dejar afuera la fila extra del mosaico -no tiene que ver con la
-     barra, es la misma medida por coincidencia). */
+  /* Alto de UNA fila de la barra superior, en desktop: una fracción del
+     ancho de pantalla. Lo usa el alto de los botones (.topbar-btn). */
   --barra-alto: calc(100vw / 23 / 2);
   /* Alto real de una fila de LA BARRA (.topbar-btn). En desktop es el
-     mismo --barra-alto (coincide con la grilla del mosaico); en
-     pantallas angostas se pisa con un valor fijo más cómodo para tocar
-     (ver @media más abajo), porque ahí --barra-alto da filas de apenas
-     ~15px. */
+     mismo --barra-alto; en pantallas angostas se pisa con un valor fijo
+     más cómodo para tocar (ver @media más abajo), porque ahí
+     --barra-alto da filas de apenas ~15px. */
   --topbar-fila-alto: var(--barra-alto);
   /* Cuántas filas ocupa la barra de botones: 1 en desktop, 3 en
      pantallas angostas (ver @media más abajo, la barra pasa a 2
      filas: "Poemas y estaciones" sola arriba, las 4 estaciones de a
-     dos abajo). .stage, #cscroll y el efecto barra (script.js) usan
+     dos abajo). #cscroll y el efecto barra (script.js) usan
      --topbar-alto (fila-alto * esta variable) para saber cuánto lugar
      ocupa la barra completa, no una sola fila. */
   --topbar-filas: 1;
@@ -57,8 +52,7 @@ body {
   flex: 1 1 auto;
   min-height: 0;                     /* deja que scrollee en vez de estirar el body */
   overflow-y: auto;
-  /* clip: corta el desborde horizontal (el desliz de las texturas) sin
-     agregar barra horizontal. */
+  /* clip: corta cualquier desborde horizontal sin agregar barra. */
   overflow-x: clip;
   /* anclaje de scroll ACTIVO: si algo por encima cambia de alto (fuentes
      que cargan, imágenes que decodifican), el navegador compensa y el
@@ -113,208 +107,10 @@ body {
 /* en "Estaciones" no hay scroll: la barra propia no se muestra */
 .vista-estaciones .cscroll { display: none; }
 
-.wrap {
-  display: grid;
-  grid-template-columns: 340px 1fr;
-  min-height: 100vh;
-}
-
-@media (max-width: 820px) {
-  .wrap { grid-template-columns: 1fr; }
-}
-
-.panel {
-  background: var(--panel);
-  border-right: 1px solid var(--panel-line);
-  padding: 36px 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 26px;
-}
-
-h1 {
-  font-family: 'Source Serif 4', serif;
-  font-weight: 600;
-  font-size: 28px;
-  line-height: 1.15;
-  margin: 0 0 4px 0;
-}
-
-.sub {
-  color: var(--text-dim);
-  font-size: 14px;
-  line-height: 1.5;
-  margin: 0;
-}
-
-.field { display: flex; flex-direction: column; gap: 8px; }
-.field label {
-  font-size: 13px;
-  color: var(--text-dim);
-}
-
-.dropzone {
-  border: 1px dashed var(--panel-line);
-  border-radius: 4px;
-  padding: 22px 16px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--text-dim);
-  cursor: pointer;
-  transition: border-color .15s ease, color .15s ease;
-}
-.dropzone:hover, .dropzone.drag {
-  border-color: var(--amber);
-  color: var(--text);
-}
-.dropzone input { display: none; }
-
-.thumbrow {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 4px;
-}
-.thumbrow img {
-  width: 40px; height: 40px;
-  object-fit: cover;
-  border-radius: 3px;
-  border: 1px solid var(--panel-line);
-}
-
-select, input[type=range] {
-  width: 100%;
-}
-select {
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--panel-line);
-  border-radius: 4px;
-  padding: 9px 10px;
-  font-family: inherit;
-  font-size: 14px;
-}
-input[type=range] {
-  accent-color: var(--amber);
-}
-.rangeval {
-  font-size: 13px;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-
-button {
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  border-radius: 4px;
-  padding: 12px 16px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background .15s ease, opacity .15s ease;
-}
-button.primary {
-  background: var(--amber);
-  color: var(--amber-text);
-}
-button.primary:disabled {
-  background: var(--amber-dim);
-  color: #c2b47e;
-  cursor: not-allowed;
-}
-button.secondary {
-  background: transparent;
-  color: var(--text);
-  border-color: var(--panel-line);
-}
-button.secondary:disabled {
-  color: var(--text-dim);
-  cursor: not-allowed;
-}
-
-.stage {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 36px;
-  min-height: 100vh;
-}
-#canvas-holder {
-  box-shadow: 0 30px 60px -25px rgba(150, 125, 40, .3);
-  line-height: 0;
-  background: #ffffff;
-}
-#canvas-holder canvas {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  border-radius: 2px;
-}
-
-.placeholder {
-  color: var(--text-dim);
-  font-size: 14px;
-  text-align: center;
-  max-width: 320px;
-  line-height: 1.6;
-}
-
-.checkbox-field { flex-direction: row; }
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: var(--text);
-  cursor: pointer;
-}
-.checkbox-label input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--amber);
-}
-
-.count {
-  font-size: 13px;
-  color: var(--text-dim);
-}
-
 /* ---------------------------------------------------------------------
-   Modo "fondo de home": oculta el panel de controles de la izquierda y
-   hace que el mosaico generado ocupe toda la pantalla como imagen de
-   fondo. Para volver a mostrar el panel (por ejemplo mientras generás
-   la imagen), comentá o borrá este bloque.
---------------------------------------------------------------------- */
-.wrap {
-  grid-template-columns: 1fr;
-}
-.panel {
-  display: none;
-}
-.stage {
-  padding: 0;
-  /* descuenta el alto de la barra superior, que ya ocupa lugar arriba */
-  min-height: calc(100vh - var(--topbar-alto));
-}
-#canvas-holder {
-  box-shadow: none;
-  background: transparent;
-  width: 100%;
-}
-#canvas-holder canvas {
-  width: 100%;
-  height: auto;
-  max-width: 100%;
-  border-radius: 0;
-  display: block;
-}
-
-/* ---------------------------------------------------------------------
-   Lectura de poemas: el mosaico se ve completo al hacer scroll (no está
-   fijo). Los poemas van por encima, repartidos de arriba a abajo a lo
-   largo del mosaico y ordenados por fecha, sin recuadro: solo el texto
-   sobre la imagen. Cada poema entra con un fundido cuando aparece en
-   pantalla.
+   Lectura de poemas: van uno abajo del otro, ordenados por fecha, sin
+   recuadro ni fondo propio -solo el texto, sobre el color de fondo de la
+   página-. Cada poema entra con un fundido cuando aparece en pantalla.
 
    Encima de ese fundido va, opcional, el efecto escritura: el título y
    los versos se teclean letra por letra con un cursor parpadeante (ver
@@ -329,46 +125,32 @@ body {
 
 /* Envuelve todo lo que va debajo de la barra superior. Al estar en el
    flujo, después de la .topbar (position: sticky), arranca justo donde
-   terminan los botones. Es position: relative para que .poem-card y
-   .textura-capa (absolutas, inset: 0) se midan contra este bloque y no
-   contra el body: así ninguna se mete detrás de la barra. */
+   terminan los botones. .poem-card (el único hijo, en flujo normal) es
+   quien le da su alto: el largo de la página sale de los poemas. */
 .contenido {
   position: relative;
 }
 
 .poem-card {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  /* La fila extra del mosaico (ver renderFixedMosaic en script.js, rows + 1)
-     se dibuja pero queda fuera del área donde se reparten los poemas: el
-     borde inferior sube un recorte. Así sumar esa fila no corre los poemas
-     hacia abajo ni agranda los huecos entre ellos. */
-  bottom: var(--barra-alto);
-  z-index: 5;
   pointer-events: none;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  /* separación entre poemas: bastante aire, para que no queden
+     amontonados en una página sin más contenido que los reparta. */
+  gap: 18vh 0;
   padding: 10vh 0;
-  /* Ancho de una columna del mosaico en pantalla: el canvas se muestra
-     al 100% del viewport y tiene 23 columnas (TARGET_WIDTH 1600 dividido
-     tileW 70, redondeado, en script.js e index.html). Se usa para ubicar
-     los poemas respecto de la grilla. */
+  /* Unidad de layout (no es una columna de nada en particular): los
+     poemas la usan para su sangría en zigzag. */
   --col: calc(100vw / 23);
 }
 .poem-card:empty {
   display: none;
 }
-/* Invierno reparte los poemas sobre un mosaico más largo (más recortes
-   reales por foto; ver mosaicoDensidad en script.js), así tienen más aire
-   entre sí sin quedar sobre el fondo pelado. Nada especial acá. */
 
 .poem {
   pointer-events: auto;
   max-width: min(680px, 90vw);
-  color: #e8ff00;
+  color: #6e2b35;
   text-shadow: 0 2px 4px rgba(0, 0, 0, .55), 0 1px 20px rgba(0, 0, 0, .6);
   /* entra con fundido + un leve traslado hacia arriba */
   opacity: 0;
@@ -382,18 +164,80 @@ body {
   opacity: 1;
   transform: none;
 }
-/* Cada poema se separa de las columnas del borde: salta la primera
-   columna entera del mosaico y arranca a un cuarto de la siguiente, o
-   sea 1¼ columnas hacia adentro. Los impares desde la izquierda, los
-   pares desde la derecha. Cambiá el 1.25 para acercarlos o alejarlos. */
-.poem:nth-child(odd) {
+/* Cada poema se separa del borde: salta una columna entera (--col) y
+   arranca a un cuarto de la siguiente, o sea 1¼ columnas hacia adentro.
+   Los impares (.poem-izq) desde la izquierda, los pares (.poem-der)
+   desde la derecha. Cambiá el 1.25 para acercarlos o alejarlos.
+   El lado lo marca una clase puesta en script.js, no nth-child/
+   nth-of-type: un poema puede terminar emparejado con una foto dentro
+   de un .poem-con-foto (ver más abajo) en vez de ser hijo directo de
+   .poem-card, y ahí esta margen/alineación NO debe aplicarse -la
+   resuelve .poem-con-foto en su lugar-, por eso el selector exige hijo
+   directo (>). text-align si aplica siempre, esté o no emparejado. */
+.poem-card > .poem-izq {
   align-self: flex-start;
   margin-left: calc(var(--col) * 1.25);
 }
-.poem:nth-child(even) {
+.poem-card > .poem-der {
   align-self: flex-end;
   margin-right: calc(var(--col) * 1.25);
-  text-align: right;
+}
+.poem-der { text-align: right; }
+
+/* Poema emparejado con una foto (ver intercalarFotos en script.js):
+   fila con los dos uno al lado del otro, no la foto sola arriba/abajo
+   del poema. El poema se queda en su margen de siempre (.poem-izq va
+   primero/a la izquierda en el DOM, .poem-der al revés) y la foto
+   ocupa el otro costado. En pantallas angostas se apilan (ver @media
+   más abajo): verla al lado de un poema angosto los dejaría a los dos
+   minúsculos.
+
+   La FILA entera lleva el mismo margen de orilla que llevaría el poema
+   solo (margin-left/right + align-self, calcado de .poem-izq/.poem-der
+   más arriba) y un ancho tope: sin esto, al no heredar nada de .poem
+   -que ya no manda, ver .poem-con-foto .poem más abajo-, quedaba
+   estirada a todo el ancho de .poem-card, poema Y foto pegados al
+   borde de la pantalla. */
+.poem-con-foto {
+  display: flex;
+  align-items: center;
+  gap: 5vw;
+  max-width: min(980px, 92vw);
+}
+.poem-card > .poem-con-foto-izq {
+  align-self: flex-start;
+  margin-left: calc(var(--col) * 1.25);
+}
+.poem-card > .poem-con-foto-der {
+  align-self: flex-end;
+  margin-right: calc(var(--col) * 1.25);
+}
+.poem-con-foto .poem { max-width: none; flex: 1 1 0; }
+
+.poem-foto {
+  margin: 0;
+  flex: 1 1 0;
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity .8s ease, transform .8s ease;
+  overflow-anchor: none;
+}
+.poem-foto.visible {
+  opacity: 1;
+  transform: none;
+}
+.poem-foto img {
+  display: block;
+  width: 100%;
+  height: auto;
+  box-shadow: 0 24px 50px -22px rgba(150, 125, 40, .4);
+}
+@media (prefers-reduced-motion: reduce) {
+  .poem-foto { transition: opacity .3s ease; transform: none; }
+}
+@media (max-width: 820px) {
+  .poem-con-foto { flex-direction: column; align-items: stretch; gap: 24px; }
+  .poem-con-foto .poem-foto { max-width: none; }
 }
 
 .poem-fecha {
@@ -440,7 +284,7 @@ body {
   width: 0;
   overflow: visible;
   margin-left: 0;
-  color: rgba(232, 255, 0, .9);
+  color: rgba(110, 43, 53, .9);
   animation: caret-blink 1s steps(1, end) infinite;
 }
 @keyframes caret-blink {
@@ -459,10 +303,8 @@ body {
 }
 
 /* ---------------------------------------------------------------------
-   Velo: capa translúcida con tinte de color. z-index 4: se
-   pinta por encima del mosaico Y de la capa de texturas (que también es
-   z-index 4 pero, al ser un hijo del DOM, se pinta antes), así el velo
-   tiñe las dos. Los poemas (z-index 5) quedan por encima, sin teñir.
+   Velo: capa translúcida con tinte de color, z-index 4, por debajo de
+   los poemas (z-index 5).
 
    El color y el modo cambian por estación. script.js pone
    body[data-estacion="..."] (ver CURRENT_SEASON):
@@ -479,7 +321,7 @@ body::after {
   /* alto explícito con dvh (no "inset:0" + el bottom implícito): en
      celulares algunos navegadores miden un position:fixed con inset:0
      contra el viewport "grande" (como si la barra de direcciones
-     estuviera siempre oculta), dejando un resto de mosaico sin teñir
+     estuviera siempre oculta), dejando un resto del fondo sin teñir
      abajo cuando la barra se muestra. dvh sigue el viewport visible real,
      igual que ya hace el body (ver más arriba). */
   height: 100dvh;
@@ -504,8 +346,8 @@ body[data-estacion="invierno"]::after {
   );
 }
 
-/* Grano: ruido sutil sobre el fondo de las estaciones (mosaico + huecos
-   + velo), para que no quede tan plano/liso. Es un ::before (pinta
+/* Grano: ruido sutil sobre el fondo de las estaciones (fondo + velo),
+   para que no quede tan plano/liso. Es un ::before (pinta
    ANTES que el velo ::after de arriba, mismo z-index: en orden de
    documento, así el velo lo tiñe por encima) con ruido generado por
    SVG (feTurbulence), sin ninguna imagen. mix-blend-mode: overlay lo
@@ -527,110 +369,15 @@ body[data-estacion]::before {
 }
 
 /* ---------------------------------------------------------------------
-   EFECTO TEXTURAS: una capa de fotos horizontales (apaisadas)
-   SUPERPUESTA encima del mosaico. Va por encima del mosaico y del velo
-   turquesa, y por debajo de los poemas (z-index 4). El mosaico y los
-   poemas quedan igual que antes; esto es una capa nueva encima de la
-   imagen de fondo.
-
-   Cubre toda la altura de la página (la misma que el mosaico). Las fotos
-   se ubican en posiciones AL AZAR a lo largo de todo el scroll (top en %
-   y lado de entrada los pone script.js). No es una franja arriba de la
-   web. Al scrollear cada foto se desliza en horizontal cruzando la
-   pantalla (ver script.js, bloque "EFECTO TEXTURAS").
---------------------------------------------------------------------- */
-.textura-capa {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  pointer-events: none;
-  /* el desliz lateral de cada foto no debe generar scroll horizontal */
-  overflow: hidden;
-  /* Aparece con un fundido cuando ya está armada (JS agrega .lista), así
-     no se ve ningún reacomodo de las fotos al cargar. */
-  opacity: 0;
-  transition: opacity .5s ease;
-  /* Ancho en pantalla de UNA columna del mosaico: el canvas se reparte
-     en 23 columnas (TARGET_WIDTH 1600 / tileW 70, redondeado; ver
-     script.js y .poem-card). Ancho, alto y top de cada textura se miden
-     como múltiplos de --col para pegar con la grilla. Este valor es un
-     respaldo: al armar la capa, script.js lo pisa con la medida exacta
-     en px (ancho del canvas / 23, sin barra de scroll). */
-  --col: calc(100vw / 23);
-}
-.textura-capa:empty { display: none; }
-.textura-capa.lista { opacity: 1; }
-
-/* EXPERIMENTAL: efecto raíces (ver script.js, bloque "EFECTO RAICES").
-   Absoluto contra .contenido (que mide toda la página, no solo la
-   pantalla visible -ver su position:relative más arriba-): así las
-   raíces, ancladas cada una a la posición real de un poema, scrollean
-   junto con los poemas y el mosaico en vez de quedarse pegadas a la
-   ventana. Por encima del mosaico y las texturas, por debajo de los
-   poemas.
-
-   Sin mix-blend-mode: invertía el color contra lo que hubiera debajo
-   -quedaban grises o de otro color según el fondo, nunca blancas de
-   verdad-. En vez de eso, cada línea se dibuja dos veces en script.js
-   (un borde oscuro grueso y, encima, un trazo blanco más fino), así se
-   ven blancas de verdad y siguen teniendo contraste en cualquier
-   fondo. */
-.raices-capa {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  pointer-events: none;
-}
-
-.textura-slide {
-  /* ubicación al azar dentro de la capa: el `top` lo pone script.js. La
-     posición horizontal real la maneja el desliz (transform), así que
-     left queda en 0 como base. */
-  position: absolute;
-  left: 0;
-  margin: 0;
-  /* ancho: al azar por foto, 5 o 6 columnas de la grilla del mosaico.
-     script.js lo fija con --w. */
-  width: var(--w, calc(var(--col) * 6));
-  will-change: transform;
-  /* Para que se lean más como textura y menos como foto suelta se puede
-     descomentar esto (multiplica los colores contra el mosaico): */
-  /* mix-blend-mode: multiply; */
-}
-
-.textura-slide img {
-  display: block;
-  width: 100%;
-  /* alto: fijo en 2 recortes del mosaico apilados. Cada recorte mide
-     tileH 60 en el canvas = --col/2 en pantalla (tileW 120 : tileH 60;
-     ver index.html), así que 2 recortes = --col. script.js lo fija con
-     --h. El ancho de la caja manda: la foto se recorta a ella con
-     object-fit. */
-  height: var(--h, calc(var(--col) * 1));
-  object-fit: cover;
-  /* puntas rectas, sin redondeo */
-  box-shadow: 0 24px 50px -22px rgba(150, 125, 40, .4);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  /* sin desliz: las fotos quedan quietas en su lugar */
-  .textura-slide { transform: none !important; }
-  /* la capa aparece de una, sin fundido */
-  .textura-capa { transition: none; }
-}
-
-/* ---------------------------------------------------------------------
    Barra superior: 5 botones rectangulares en fila. Va en el flujo
    normal, arriba de todo, y con position: sticky queda pegada al borde
    de arriba al hacer scroll. Como ocupa su lugar en el flujo, el
-   mosaico (y todo lo demás) arranca automáticamente justo debajo de
-   los botones, sin cálculos de por medio. Por ahora es solo maqueta
-   visual: los botones no tienen acción. Los 5 rectángulos reparten el
+   contenido (y todo lo demás) arranca automáticamente justo debajo de
+   los botones, sin cálculos de por medio. Los 5 rectángulos reparten el
    ancho en partes iguales (flex: 1). Para sacarla, borrá el
    <nav class="topbar"> de index.html.
 
-   Altura: --barra-alto (ver :root), la misma que un recorte del
-   mosaico.
+   Altura: --barra-alto (ver :root).
 
    Colores: cada botón lleva un color distinto (ver .topbar-btn:nth-child
    más abajo). Cambiá esos valores para otra paleta.
@@ -674,12 +421,9 @@ body[data-estacion]::before {
      - "Estaciones" (portada, texto corto): SÍ lo reserva
        (.vista-estaciones .scroll-area, más abajo) -que el título
        quedara tapado al abrir la web sería un problema real.
-     - Estación (invierno/otoño, mosaico largo): NO lo reserva- el
-       mosaico ya arranca ocupando toda la pantalla y la barra
-       simplemente tapa/destapa su borde de arriba, así nunca queda
-       un hueco vacío ni arriba ni abajo mientras se scrollea (si
-       reservara Y se moviera el mosaico para compensar, quedaría el
-       mismo problema de animar layout de más arriba). */
+     - Estación (invierno/otoño): NO lo reserva -la barra queda fija,
+       superpuesta, y .poem-card compensa con padding-top (más abajo)
+       para que el primer poema no arranque tapado-. */
 @media (max-width: 820px) {
   .topbar {
     position: fixed;
@@ -701,17 +445,10 @@ body[data-estacion]::before {
   body:not(.vista-estaciones) .cscroll {
     top: 0;
   }
-  /* ídem .stage (el fondo del mosaico): llena la pantalla completa, no
-     "pantalla menos la barra" -ya no hay nada reservado que restar-.
-     Solo importa para estación: en la portada .stage ni se muestra. */
-  .stage {
-    min-height: 100dvh;
-  }
-  /* El mosaico de fondo llena la pantalla completa (arriba), pero el
-     TEXTO de los poemas no debe arrancar tapado por la barra -a
-     diferencia del fondo, tapar la fecha del primer poema sí se nota-.
-     Se empuja el primero (y todos) hacia abajo lo que mide la barra,
-     de más al padding-top que ya tenían. */
+  /* La barra queda fija y superpuesta (arriba), así que el primer poema
+     no debe arrancar tapado por ella -a diferencia de la portada, acá sí
+     se nota-. Se empuja el primero (y todos) hacia abajo lo que mide la
+     barra, de más al padding-top que ya tenían. */
   body:not(.vista-estaciones) .poem-card {
     padding-top: calc(10vh + var(--topbar-alto));
   }
@@ -719,8 +456,8 @@ body[data-estacion]::before {
 .topbar-btn {
   flex: 1 1 0;
   min-width: 0;
-  /* alto de un recorte del mosaico en desktop; en pantallas angostas
-     un valor fijo más cómodo (ver --topbar-fila-alto en :root) */
+  /* --barra-alto en desktop; en pantallas angostas un valor fijo más
+     cómodo (ver --topbar-fila-alto en :root) */
   height: var(--topbar-fila-alto);
   display: flex;
   align-items: center;
@@ -766,19 +503,13 @@ body[data-estacion]::before {
    estaciones" (1er botón) ocupa toda la fila de arriba, y las 4
    estaciones se acomodan de a dos abajo -otoño/invierno una fila,
    primavera/verano la siguiente-. --topbar-filas pasa a 3 (ver :root)
-   para que --topbar-alto (usado por .stage, #cscroll y el efecto
-   barra de script.js) sepa cuánto lugar ocupa la barra entera ahora,
-   no solo una fila. --topbar-fila-alto también se pisa: en desktop
-   coincide con un recorte del mosaico (--barra-alto), pero acá eso da
-   filas de apenas ~15px, muy finas para tocar; 44px es el mínimo
-   recomendado de tap target (iOS/Android). */
+   para que --topbar-alto (usado por #cscroll y el efecto barra de
+   script.js) sepa cuánto lugar ocupa la barra entera ahora, no solo una
+   fila. --topbar-fila-alto también se pisa: en desktop sale de
+   --barra-alto, pero acá eso da filas de apenas ~15px, muy finas para
+   tocar; 44px es el mínimo recomendado de tap target (iOS/Android). */
 @media (max-width: 820px) {
   :root {
-    /* el mosaico de fondo pasa a 6 columnas acá (ver script.js, tileW/
-       tileH de los sliders), no 13: --barra-alto tiene que seguir
-       midiendo un recorte real para que .poem-card (bottom) no quede
-       desalineado. */
-    --barra-alto: calc(100vw / 6 / 2);
     --topbar-filas: 3;
     --topbar-fila-alto: 44px;
   }
@@ -794,12 +525,13 @@ body[data-estacion]::before {
 /* ---------------------------------------------------------------------
    Pestaña "Estaciones": la pantalla de entrada, la que se ve al abrir la
    web sin ?estacion=... en la URL. Es una página aparte, en blanco, solo
-   con fotos: sin mosaico ni poemas. La barra de arriba sigue visible y
-   con todos los botones activos.
+   con fotos: sin poemas (.poem-card queda vacío, y por eso oculto, ver
+   .poem-card:empty más arriba). La barra de arriba sigue visible y con
+   todos los botones activos.
 
    script.js pone la clase .vista-estaciones en el <body> cuando no hay
-   estación elegida: ahí se muestra .estaciones-home y se oculta .wrap
-   (el mosaico). Con una estación elegida es al revés.
+   estación elegida: ahí se muestra .estaciones-home. Con una estación
+   elegida es al revés.
 --------------------------------------------------------------------- */
 .estaciones-home { display: none; }
 /* fondo un poquito más blanco que el crema general (--bg) para esta vista */
@@ -808,7 +540,6 @@ body.vista-estaciones { background: #fefcf4; }
    que sobra se recorta. Las fotos van en una grilla que reparte el
    espacio: con pocas se ven grandes, al agregar más se achican para que
    sigan entrando todas sin scroll. */
-.vista-estaciones .wrap { display: none; }
 .vista-estaciones .estaciones-home {
   position: relative;              /* ancla del cuadrado de arriba a la derecha */
   display: grid;
@@ -830,8 +561,9 @@ body.vista-estaciones { background: #fefcf4; }
 /* Pase de fotos arriba a la derecha: desde el 60% del ancho (donde
    arranca el botón "Primavera", 4º de 5) hasta el borde derecho, y de
    arriba abajo de la pantalla de Estaciones. Sin recuadro ni fondo: solo
-   la foto. Pasa UNA a la vez (las mismas de los mosaicos), cambiando cada
-   ciertos segundos con un fundido. Lo maneja script.js ("FOTOS DE LA
+   la foto. Pasa UNA a la vez (las fotos de cada estación, ESTACIONES.
+   <estacion>.fotos), cambiando cada ciertos segundos con un fundido. Lo
+   maneja script.js ("FOTOS DE LA
    PESTAÑA ESTACIONES"). Todas las fotos ocupan exactamente el mismo
    espacio (object-fit: cover). */
 .estaciones-cuadro {
